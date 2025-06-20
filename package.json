@@ -1,0 +1,33 @@
+{
+    "name": "Hermes",
+    "version": "1.0.0",
+    "description": "HackIllinois Outreach Automation Platform",
+    "main": "src/index.ts",
+    "repository": "https://github.com/HackIllinois/Hermes.git",
+    "author": "akulsharma1 <akulsharma02@gmail.com>",
+    "license": "MIT",
+    "scripts": {
+        "start": "ts-node src/index.ts",
+        "format:check": "yarn run prettier --check '**/*.{ts,js,cjs,json}'",
+        "format": "yarn run prettier --write '**/*.{ts,js,cjs,json}'",
+        "lint:check": "yarn run eslint src --ext .js,.jsx,.ts,.tsx",
+        "lint": "yarn run eslint src --ext .js,.jsx,.ts,.tsx --fix",
+        "build": "tsc",
+        "verify": "yarn build && yarn lint:check && yarn format:check"
+    },
+    "dependencies": {
+        "@supabase/supabase-js": "^2.50.0",
+        "cors": "^2.8.5",
+        "dotenv": "^16.5.0",
+        "express": "^5.1.0",
+        "express-serve-static-core": "^0.1.1",
+        "status-code-enum": "^1.0.0",
+        "ts-node": "^10.9.2",
+        "typescript": "^5.8.3"
+    },
+    "devDependencies": {
+        "@types/cors": "^2.8.19",
+        "eslint": "^9.29.0",
+        "prettier": "^3.5.3"
+    }
+}
