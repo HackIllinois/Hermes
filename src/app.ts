@@ -17,7 +17,7 @@ app.use(cors());
 // Create API router for all API routes
 const apiRouter = express.Router();
 apiRouter.use("/auth", authRouter);
-apiRouter.use("/sponsor", sponsorRouter);
+apiRouter.use("/sponsors", sponsorRouter);
 
 // Mount API router under /api
 app.use("/api", apiRouter);
