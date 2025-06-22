@@ -8,7 +8,7 @@ import { Tables } from "../../lib/db/strings";
 
 const authRouter: Router = Router();
 
-authRouter.get("/profile", async (req: Request, res: Response, next: NextFunction) => {
+authRouter.get("/login", async (req: Request, res: Response, next: NextFunction) => {
     const redirectUrl = BASE_BACKEND_URL + "/auth/callback";
     const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "google",
@@ -21,13 +21,10 @@ authRouter.get("/profile", async (req: Request, res: Response, next: NextFunctio
         return next(new RouterError(StatusCode.ServerErrorInternal, "Error signing in with Google", null, error));
     }
 
-    console.log("redirecting to ", data.url);
-
     res.redirect(data.url);
 });
 
 authRouter.get("/callback", async (req: Request, res: Response, next: NextFunction) => {
-    console.log("creating callback");
     const code: string = req.query.code as string;
     if (!code) {
         return next(new RouterError(StatusCode.ClientErrorBadRequest, "Missing code"));
@@ -44,10 +41,15 @@ authRouter.get("/callback", async (req: Request, res: Response, next: NextFuncti
 
     const user = session.user;
 
+    // kinda a hacky way to get the role of the user, but it works. load isn't really a concern anyways
+    const { data: existing } = await supabase.from(Tables.PROFILES).select("role").eq("id", user.id).maybeSingle();
+
+    const roleToUse = existing?.role ?? "MEMBER";
+
     const profileRow = {
         id: user.id,
         name: user.user_metadata.full_name ?? user.email!,
-        role: "MEMBER" as Database["public"]["Enums"]["user_role"],
+        role: roleToUse,
     };
 
     const { error: dbErr } = await supabase.from(Tables.PROFILES).upsert(profileRow);
