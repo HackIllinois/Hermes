@@ -19,3 +19,4 @@ export const validateEnv = (): void => {
 };
 
 export const BASE_FRONTEND_URL = config.ENVIRONMENT == "DEV" ? "http://localhost:3000" : "https://hermes.hackillinois.org";
+export const BASE_BACKEND_URL = config.ENVIRONMENT == "DEV" ? `http://localhost:5555` : "https://hermes.hackillinois.org/api";
