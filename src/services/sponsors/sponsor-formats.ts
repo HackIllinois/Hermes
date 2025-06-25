@@ -1,6 +1,7 @@
 import { Database } from "../../lib/db/schemas";
 
 export type SponsorInsert = Database["public"]["Tables"]["sponsors"]["Insert"];
+export type SponsorSelect = Database["public"]["Tables"]["sponsors"]["Row"];
 
 export function isValidSponsorInsertFormat(sponsor: SponsorInsert): boolean {
     if (!sponsor) {
