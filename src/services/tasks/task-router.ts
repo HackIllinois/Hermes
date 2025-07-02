@@ -50,9 +50,9 @@ taskRouter.post("/", async (req: Request, res: Response, next: NextFunction) => 
 });
 
 taskRouter.get("/owner/:id", async (req: Request, res: Response, next: NextFunction) => {
-    const { id } = req.params;
+    const { owner_id } = req.params;
 
-    if (!isValidIdFormat(id)) {
+    if (!isValidIdFormat(owner_id)) {
         return next(new RouterError(StatusCode.ClientErrorBadRequest, "Invalid user ID"));
     }
 
