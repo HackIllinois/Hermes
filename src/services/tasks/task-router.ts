@@ -56,7 +56,7 @@ taskRouter.get("/owner/:id", async (req: Request, res: Response, next: NextFunct
         return next(new RouterError(StatusCode.ClientErrorBadRequest, "Invalid user ID"));
     }
 
-    const { data, error } = await supabase.from(Tables.CONTACT_TASKS).select("*").eq("owner_id", id);
+    const { data, error } = await supabase.from(Tables.CONTACT_TASKS).select("*").eq("owner_id", owner_id);
 
     if (error) {
         return next(new RouterError(StatusCode.ServerErrorInternal, "Error fetching tasks", null, error));
