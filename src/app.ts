@@ -6,6 +6,7 @@ import { ErrorHandler } from "./middleware/error-handler";
 import { validateEnv } from "./config";
 import authRouter from "./services/auth/auth-router";
 import sponsorRouter from "./services/sponsors/sponsor-router";
+import taskRouter from "./services/tasks/task-router";
 
 validateEnv();
 
@@ -18,6 +19,7 @@ app.use(cors());
 const apiRouter = express.Router();
 apiRouter.use("/auth", authRouter);
 apiRouter.use("/sponsors", sponsorRouter);
+apiRouter.use("/tasks", taskRouter);
 
 // Mount API router under /api
 app.use("/api", apiRouter);
