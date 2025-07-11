@@ -16,11 +16,13 @@
         "verify": "yarn build && yarn lint:check && yarn format:check"
     },
     "dependencies": {
+        "@google-cloud/local-auth": "2.1.0",
         "@supabase/supabase-js": "^2.50.0",
         "cors": "^2.8.5",
         "dotenv": "^16.5.0",
         "express": "^5.1.0",
         "express-serve-static-core": "^0.1.1",
+        "googleapis": "^150.0.1",
         "status-code-enum": "^1.0.0",
         "ts-node": "^10.9.2",
         "typescript": "^5.8.3"
