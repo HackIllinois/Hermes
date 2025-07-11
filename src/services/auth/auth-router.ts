@@ -58,7 +58,12 @@ authRouter.get("/callback", async (req: Request, res: Response, next: NextFuncti
         return next(new RouterError(StatusCode.ServerErrorInternal, "Error creating profile", null, dbErr));
     }
 
-    return res.status(StatusCode.SuccessOK).json({ message: "Authentication successful" });
+    return res.status(StatusCode.SuccessOK).json({
+        message: "Authentication successful",
+        access_token: session.access_token,
+        refresh_token: session.refresh_token,
+        expires_in: session.expires_in,
+    });
 });
 
 export default authRouter;

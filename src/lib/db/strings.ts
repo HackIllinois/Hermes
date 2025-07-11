@@ -5,3 +5,8 @@ export const Tables = {
     PROFILES: "profiles",
     SPONSORS: "sponsors",
 } as const;
+
+export const Roles = {
+    LEAD: "LEAD",
+    MEMBER: "MEMBER",
+};
