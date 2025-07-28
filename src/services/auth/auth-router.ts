@@ -14,6 +14,11 @@ authRouter.get("/login", async (req: Request, res: Response, next: NextFunction)
         provider: "google",
         options: {
             redirectTo: redirectUrl,
+            scopes: "https://www.googleapis.com/auth/gmail.send",
+            queryParams: {
+                access_type: "offline",
+                prompt: "consent",
+            },
         },
     });
 
@@ -50,6 +55,8 @@ authRouter.get("/callback", async (req: Request, res: Response, next: NextFuncti
         id: user.id,
         name: user.user_metadata.full_name ?? user.email!,
         role: roleToUse,
+        gmail_token: session.provider_token as string,
+        gmail_refresh: session.provider_refresh_token as string,
     };
 
     const { error: dbErr } = await supabase.from(Tables.PROFILES).upsert(profileRow);
