@@ -9,4 +9,22 @@ export const Tables = {
 export const Roles = {
     LEAD: "LEAD",
     MEMBER: "MEMBER",
-};
+} as const;
+
+export const EmailDirections = {
+    INBOUND: "INBOUND",
+    OUTBOUND: "OUTBOUND",
+} as const;
+
+export const EmailStatus = {
+    PENDING: "PENDING",
+    SENT: "SENT",
+    REPLIED: "REPLIED",
+    FOLLOWED_UP: "FOLLOWED_UP",
+    COMPLETED: "COMPLETED",
+} as const;
+
+export const EmailReplyTypes = {
+    REPLY: "REPLY",
+    REPLY_ALL: "REPLY_ALL",
+} as const;

@@ -7,6 +7,7 @@ import { validateEnv } from "./config";
 import authRouter from "./services/auth/auth-router";
 import sponsorRouter from "./services/sponsors/sponsor-router";
 import taskRouter from "./services/tasks/task-router";
+import emailRouter from "./services/emails/email-router";
 
 validateEnv();
 
@@ -20,6 +21,7 @@ const apiRouter = express.Router();
 apiRouter.use("/auth", authRouter);
 apiRouter.use("/sponsors", sponsorRouter);
 apiRouter.use("/tasks", taskRouter);
+apiRouter.use("/emails", emailRouter);
 
 // Mount API router under /api
 app.use("/api", apiRouter);

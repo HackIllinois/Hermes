@@ -5,6 +5,8 @@ dotenv.config();
 export const config = {
     SUPABASE_URL: process.env.SUPABASE_URL || "",
     SUPABASE_KEY: process.env.SUPABASE_KEY || "",
+    GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID || "",
+    GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET || "",
     ENVIRONMENT: process.env.ENVIRONMENT || "DEV",
 } as const;
 
