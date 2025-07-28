@@ -34,7 +34,7 @@ export async function createUser(req: Request, res: Response, next: NextFunction
 /**
  * Checks if the user is a lead. If not, returns a 403 error.
  */
-export async function requireLead(req: Request, res: Response, next: NextFunction) {
+export async function requireLeadRole(req: Request, res: Response, next: NextFunction) {
     const user = (req as any).user;
 
     if (!user || !user.role) {
@@ -50,7 +50,7 @@ export async function requireLead(req: Request, res: Response, next: NextFunctio
 /**
  * Checks if the user is a member. If not, returns a 403 error.
  */
-export async function requireMember(req: Request, res: Response, next: NextFunction) {
+export async function requireMemberRole(req: Request, res: Response, next: NextFunction) {
     const user = (req as any).user;
 
     if (!user || !user.role) {
