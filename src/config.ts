@@ -10,6 +10,8 @@ export const config = {
     ENVIRONMENT: process.env.ENVIRONMENT || "DEV",
 } as const;
 
+export const isProductionEnvironment = config.ENVIRONMENT === "PROD";
+
 export const validateEnv = (): void => {
     const requiredEnvVars = ["SUPABASE_URL", "SUPABASE_KEY"];
 

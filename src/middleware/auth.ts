@@ -8,15 +8,16 @@ import { Roles, Tables } from "../lib/db/strings";
  * Creates a user object from the auth token and attaches it to the request object
  */
 export async function createUser(req: Request, res: Response, next: NextFunction) {
-    const auth = req.headers.authorization;
-    if (!auth) {
+    const token = req.cookies["sb-access-token"];
+
+    if (!token) {
         return next(new RouterError(StatusCode.ClientErrorUnauthorized, "Missing auth token"));
     }
 
     const {
         data: { user },
         error,
-    } = await supabase.auth.getUser(auth); // validates the JWT :contentReference[oaicite:0]{index=0}
+    } = await supabase.auth.getUser(token);
 
     if (error || !user) return next(new RouterError(StatusCode.ClientErrorUnauthorized, "Invalid or expired token", null, error));
 
