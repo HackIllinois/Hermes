@@ -4,10 +4,11 @@ import { RouterError } from "../../middleware/error-handler";
 import StatusCode from "status-code-enum";
 import { EmailDirections, EmailReplyTypes, EmailStatus, Tables } from "../../lib/db/strings";
 import { supabase } from "../../lib/supabase";
-import { getGmailClient, makeRawMessage, parseGmailMessage } from "./email-helpers";
+import { getGmailClient, getHeaderVal, makeRawMessage, parseGmailMessage, stripBrackets } from "./email-helpers";
 import { isValidEmailSendRequest, EmailSendRequest, EmailReplyRequest, isValidEmailReplyRequest } from "./email-formats";
 import { EmailInsert, EmailThreadInsert } from "./email-helpers";
 import { gmail_v1 } from "googleapis";
+import { isValidIdFormat } from "../tasks/task-formats";
 
 const emailRouter: Router = Router();
 
@@ -38,7 +39,6 @@ const emailRouter: Router = Router();
  *   - cc: string[] (optional) - Array of email addresses to CC
  *   - bcc: string[] (optional) - Array of email addresses to BCC
  *
- * @headers {string} Authorization - Bearer token for user authentication
  *
  * @returns {Object} JSON response containing:
  *   - Success (200):
@@ -99,6 +99,10 @@ emailRouter.post("/send", createUser, requireMemberRole, async (req: Request, re
             return next(new RouterError(StatusCode.ClientErrorBadRequest, "Task is missing sponsor email."));
         }
 
+        const toList = Array.from(
+            new Set((sendRequest.to && sendRequest.to.length > 0 ? sendRequest.to : [sponsorEmail]).map((e) => e.toLowerCase())),
+        );
+
         // 5. Check if an email thread already exists for this task
         const { data: threadData } = await supabase
             .from(Tables.EMAIL_THREADS)
@@ -115,14 +119,15 @@ emailRouter.post("/send", createUser, requireMemberRole, async (req: Request, re
 
         // 6. Construct and send the email via Gmail API
         const rawMessage = makeRawMessage(
-            sponsorEmail,
+            toList.join(", "),
             senderEmail,
             user.user_metadata?.name,
             subject,
             body,
             sendRequest.cc,
             sendRequest.bcc,
-            [],
+            undefined,
+            undefined,
             undefined,
         );
 
@@ -140,13 +145,14 @@ emailRouter.post("/send", createUser, requireMemberRole, async (req: Request, re
             return next(new RouterError(StatusCode.ServerErrorInternal, "Failed to send email via Gmail API."));
         }
 
-        // 7. Update database records post-send
-        let dbThreadId = threadData?.id;
+        const sentMeta = await gmail.users.messages.get({
+            userId: "me",
+            id: sentMessage.id!, // Gmail internal id
+            format: "metadata",
+            metadataHeaders: ["Message-ID"],
+        });
 
-        // If no thread existed in our DB, create one now.
-        if (!dbThreadId) {
-            return next(new RouterError(StatusCode.ClientErrorBadRequest, "Failed to create thread in DB."));
-        }
+        const rfcMsgId = stripBrackets(getHeaderVal(sentMeta.data.payload?.headers, "Message-ID"));
 
         const newThread: EmailThreadInsert = {
             task_id: contact_task_id,
@@ -170,18 +176,25 @@ emailRouter.post("/send", createUser, requireMemberRole, async (req: Request, re
                 ),
             );
         }
-        dbThreadId = newDbThread.id;
+        let dbThreadId = newDbThread.id;
 
         // Record the sent email in the `emails` table using the EmailInsert type.
         const newEmail: EmailInsert = {
             thread_id: dbThreadId,
-            message_id: sentMessage.id,
+            gmail_message_id: sentMessage.id,
             sender_email: senderEmail,
             subject: subject,
             body: body,
             direction: EmailDirections.OUTBOUND,
             sent_at: new Date().toISOString(),
+            to_recipients: toList,
+            cc_recipients: sendRequest.cc || [],
+            bcc_recipients: sendRequest.bcc || [],
+            rfc_in_reply_to: null,
+            rfc_message_id: rfcMsgId,
+            rfc_references: null,
         };
+
         await supabase.from(Tables.EMAILS).insert(newEmail);
 
         // Update the task status to 'SENT'.
@@ -200,59 +213,6 @@ emailRouter.post("/send", createUser, requireMemberRole, async (req: Request, re
     }
 });
 
-/**
- * POST /emails/reply
- *
- * Sends a reply to an existing email thread.
- *
- * @description This endpoint handles the complex process of replying to an existing email thread.
- *              The process involves multiple sophisticated steps:
- *
- *              1. **Validation**: Validates the reply request format and ensures all required fields are present
- *              2. **Gmail Client Setup**: Gets an authenticated Gmail client for the user
- *              3. **Original Message Retrieval**: Fetches the original message metadata from Gmail API to extract headers
- *              4. **Header Parsing**: Extracts critical headers (From, To, Cc, Subject, Message-ID, References) from the original message
- *              5. **Recipient Management**: Intelligently handles recipient lists based on reply type:
- *                 - REPLY: Sends only to the original sender
- *                 - REPLY_ALL: Includes all original recipients (excluding the user's own email)
- *              6. **Email Construction**: Creates a properly formatted reply with:
- *                 - Correct subject line (adds "Re:" prefix if not present)
- *                 - Proper threading headers (In-Reply-To, References)
- *                 - Appropriate recipient lists
- *              7. **Gmail API Send**: Sends the reply via Gmail API using the existing thread ID
- *              8. **Database Recording**: Records the sent reply in the database and optionally updates task status
- *
- *              The endpoint ensures proper email threading, maintains conversation context,
- *              and handles the complexities of Gmail's threading system.
- *
- * @body {EmailReplyRequest} replyRequest - The email reply request with the following structure:
- *   - thread_id: string - Gmail thread ID for the conversation
- *   - message_id_to_reply_to: string - Gmail message ID of the message being replied to
- *   - body: string - Reply email body content
- *   - reply_type: "REPLY" | "REPLY_ALL" - Type of reply (single recipient vs all recipients)
- *   - cc: string[] (optional) - Additional email addresses to CC
- *   - bcc: string[] (optional) - Additional email addresses to BCC
- *
- * @headers {string} Authorization - Bearer token for user authentication
- *
- * @returns {Object} JSON response containing:
- *   - Success (200):
- *     {
- *       message: "Reply sent successfully.",
- *       data: gmail_v1.Schema$Message
- *     }
- *   - Error (400): Invalid request format or missing original message headers
- *   - Error (500): Gmail API failure or database error
- *
- * @throws {RouterError} 400 - Invalid request body format or missing original message headers
- * @throws {RouterError} 401 - Missing or invalid authentication token
- * @throws {RouterError} 403 - User does not have member role access
- * @throws {RouterError} 500 - Gmail API failure, database error, or unexpected error
- *
- * @see EmailReplyRequest - Type definition for email reply request
- * @see EmailInsert - Type definition for email database record
- * @see EmailReplyTypes - Available reply types (REPLY, REPLY_ALL)
- */
 emailRouter.post("/reply", createUser, requireMemberRole, async (req: Request, res: Response, next: NextFunction) => {
     const replyRequest: EmailReplyRequest = req.body;
 
@@ -264,70 +224,117 @@ emailRouter.post("/reply", createUser, requireMemberRole, async (req: Request, r
     const gmail = await getGmailClient(user.id);
 
     try {
-        const originalMessage = await gmail.users.messages.get({
-            userId: "me",
-            id: req.body.message_id_to_reply_to,
-            format: "metadata",
-            metadataHeaders: ["From", "To", "Cc", "Subject", "Message-ID", "References"],
-        });
+        const { data: dbThread, error: threadError } = await supabase
+            .from(Tables.EMAIL_THREADS)
+            .select("id, task_id, thread_id")
+            .eq("id", replyRequest.db_thread_id)
+            .single();
 
-        const headers = originalMessage.data.payload?.headers;
-        if (!headers) {
-            return next(new RouterError(StatusCode.ClientErrorBadRequest, "Original message headers not found."));
+        if (threadError || !dbThread) {
+            return next(
+                new RouterError(StatusCode.ClientErrorNotFound, "Email thread not found in database.", null, threadError),
+            );
         }
 
-        const originalFrom = headers.find((h) => h.name === "From")?.value || "";
-        const originalTo = headers.find((h) => h.name === "To")?.value || "";
-        const originalCc = headers.find((h) => h.name === "Cc")?.value || "";
-        const originalSubject = headers.find((h) => h.name === "Subject")?.value || "";
-        const originalMessageId = headers.find((h) => h.name === "Message-ID")?.value;
-        const originalReferences = headers.find((h) => h.name === "References")?.value;
+        const googleThreadId = dbThread.thread_id;
 
-        if (!originalMessageId || !originalFrom) {
+        const { data: emailToReplyTo, error: emailToReplyToError } = await supabase
+            .from(Tables.EMAILS)
+            .select("*")
+            .eq("gmail_message_id", replyRequest.message_id_to_reply_to)
+            .single();
+
+        if (emailToReplyToError || !emailToReplyTo) {
             return next(
-                new RouterError(StatusCode.ClientErrorBadRequest, "Cannot reply: original message is missing key headers."),
+                new RouterError(StatusCode.ClientErrorNotFound, "Email to reply to not found.", null, emailToReplyToError),
             );
         }
 
         let to: string[] = [];
-        let cc: string[] = [...(replyRequest.cc || [])];
+        let cc: string[] = [...(replyRequest.cc || [])]; // Start with any new CCs from the request
 
-        const fromEmail = originalFrom.includes("<") ? originalFrom.split("<")[1].split(">")[0] : originalFrom;
-        to.push(fromEmail);
+        const isReplyingToSelf = emailToReplyTo.sender_email === user.email;
 
-        if (replyRequest.reply_type === EmailReplyTypes.REPLY_ALL) {
-            const allRecipients = (originalTo + "," + originalCc).split(",").filter((e) => e.trim() !== "");
-            for (const recipient of allRecipients) {
-                const email = recipient.includes("<") ? recipient.split("<")[1].split(">")[0] : recipient.trim();
-                // Add to CC if it's not the user's own email and not already in the 'To' list
-                if (email !== user.email && !to.includes(email)) {
-                    cc.push(email);
-                }
+        if (isReplyingToSelf) {
+            const originalTo = emailToReplyTo.to_recipients || [];
+            const originalCc = emailToReplyTo.cc_recipients || [];
+
+            to.push(...originalTo);
+            cc.push(...originalCc);
+        } else {
+            // SCENARIO: User is replying to an email from someone else.
+            const originalSender = emailToReplyTo.sender_email;
+            to.push(originalSender);
+
+            if (replyRequest.reply_type === EmailReplyTypes.REPLY_ALL) {
+                // Add original 'To' list to CC (excluding user and new 'To' recipient)
+                (emailToReplyTo.to_recipients || []).forEach((recipient) => {
+                    if (recipient !== user.email && recipient !== originalSender) {
+                        cc.push(recipient);
+                    }
+                });
+                // Add original 'Cc' list to CC (excluding user)
+                (emailToReplyTo.cc_recipients || []).forEach((recipient) => {
+                    if (recipient !== user.email) {
+                        cc.push(recipient);
+                    }
+                });
             }
         }
 
-        cc = [...new Set(cc)];
+        // Final cleanup: remove duplicates and the user's own email from the final lists.
+        to = [...new Set(to.filter((email) => email !== user.email))];
+        cc = [...new Set(cc.filter((email) => email !== user.email && !to.includes(email)))];
 
-        const newReferences = originalReferences ? `${originalReferences} ${originalMessageId}` : originalMessageId;
-        const newSubject = originalSubject.toLowerCase().startsWith("re:") ? originalSubject : `Re: ${originalSubject}`;
+        // This is a safeguard. If 'To' becomes empty, move the first 'Cc' to 'To'.
+        if (to.length === 0 && cc.length > 0) {
+            to.push(cc.shift()!);
+        }
+
+        if (to.length === 0) {
+            return next(new RouterError(StatusCode.ClientErrorBadRequest, "Could not determine a recipient for the reply."));
+        }
+
+        const parentRfcId = emailToReplyTo.rfc_message_id || stripBrackets(emailToReplyTo.gmail_message_id) || null;
+
+        if (!parentRfcId) {
+            return next(
+                new RouterError(
+                    StatusCode.ClientErrorBadRequest,
+                    "Missing RFC Message-ID to reply to (cannot set In-Reply-To/References).",
+                ),
+            );
+        }
+
+        const newSubject = emailToReplyTo.subject?.toLowerCase().startsWith("re:")
+            ? emailToReplyTo.subject
+            : `Re: ${emailToReplyTo.subject}`;
+
+        const referencesHeaderValue = [
+            emailToReplyTo.rfc_references, // may be null/empty
+            parentRfcId,
+        ]
+            .filter(Boolean)
+            .join(" ");
 
         const rawMessage = makeRawMessage(
             to.join(", "),
             user.email,
             user.user_metadata?.name,
-            newSubject,
+            newSubject!,
             replyRequest.body,
             cc,
             replyRequest.bcc,
-            [newReferences], // Pass as messageIdList
-            originalMessage.data.threadId!, // Use the existing threadId
+            parentRfcId,
+            referencesHeaderValue,
+            googleThreadId,
         );
 
         const { data: sentMessage } = await gmail.users.messages.send({
             userId: "me",
             requestBody: {
                 raw: rawMessage,
-                threadId: originalMessage.data.threadId,
+                threadId: googleThreadId,
             },
         });
 
@@ -335,26 +342,31 @@ emailRouter.post("/reply", createUser, requireMemberRole, async (req: Request, r
             return next(new RouterError(StatusCode.ServerErrorInternal, "Failed to send reply via Gmail API."));
         }
 
-        // 5. Record the sent reply in your database
-        const { data: dbThread } = await supabase
-            .from(Tables.EMAIL_THREADS)
-            .select("id, task_id")
-            .eq("thread_id", originalMessage.data.threadId!)
-            .single();
-        if (dbThread) {
-            const newEmail: EmailInsert = {
-                thread_id: dbThread.id,
-                message_id: sentMessage.id,
-                sender_email: user.email,
-                subject: newSubject,
-                body: replyRequest.body,
-                direction: EmailDirections.OUTBOUND,
-                sent_at: new Date().toISOString(),
-            };
-            await supabase.from(Tables.EMAILS).insert(newEmail);
-            // Optionally update the task status to FOLLOWED_UP
-            // await supabase.from(Tables.CONTACT_TASKS).update({ status: EmailStatus.FOLLOWED_UP }).eq("id", dbThread.task_id);
-        }
+        const sentMeta = await gmail.users.messages.get({
+            userId: "me",
+            id: sentMessage.id!,
+            format: "metadata",
+            metadataHeaders: ["Message-ID", "References", "In-Reply-To"],
+        });
+
+        const newRfcId = stripBrackets(getHeaderVal(sentMeta.data.payload?.headers, "Message-ID"));
+
+        const newEmail: EmailInsert = {
+            thread_id: dbThread.id,
+            gmail_message_id: sentMessage.id,
+            sender_email: user.email,
+            subject: newSubject,
+            body: replyRequest.body,
+            direction: EmailDirections.OUTBOUND,
+            sent_at: new Date().toISOString(),
+            to_recipients: to,
+            cc_recipients: cc,
+            bcc_recipients: replyRequest.bcc || [],
+            rfc_message_id: newRfcId,
+            rfc_in_reply_to: parentRfcId,
+            rfc_references: referencesHeaderValue,
+        };
+        await supabase.from(Tables.EMAILS).insert(newEmail);
 
         return res.status(StatusCode.SuccessOK).json({ message: "Reply sent successfully.", data: sentMessage });
     } catch (error) {
@@ -370,8 +382,6 @@ emailRouter.post("/reply", createUser, requireMemberRole, async (req: Request, r
  * @description This endpoint fetches the Gmail profile information for the currently authenticated user.
  *              It uses the user's stored Gmail tokens to authenticate with the Gmail API and retrieve
  *              their profile details including email address, display name, and other Gmail account information.
- *
- * @headers {string} Authorization - Bearer token for user authentication
  *
  * @returns {Object} JSON response containing:
  *   - Success (200):
@@ -402,6 +412,8 @@ emailRouter.get("/profile", createUser, requireMemberRole, async (req: Request, 
 /**
  * GET /emails/sync
  *
+ * TODO: update endpoint to use the new rfc_in_reply_to and rfc_references fields.
+ *
  * Synchronizes new incoming emails from Gmail with the local database.
  *
  * @description This endpoint performs a complex synchronization process to fetch and process new emails
@@ -424,7 +436,6 @@ emailRouter.get("/profile", createUser, requireMemberRole, async (req: Request, 
  *              avoiding unnecessary processing of unrelated emails. It also handles the complexities of
  *              Gmail's threading system and ensures proper task status updates when sponsors reply.
  *
- * @headers {string} Authorization - Bearer token for user authentication
  *
  * @returns {Object} JSON response containing:
  *   - Success (200):
@@ -541,12 +552,16 @@ emailRouter.get("/sync", createUser, requireMemberRole, async (req: Request, res
 
                     const newEmailRecord: EmailInsert = {
                         thread_id: threadInfo.dbId,
-                        message_id: fullMessage.id!,
+                        gmail_message_id: fullMessage.id!,
                         sender_email: parsedEmail.from,
                         subject: parsedEmail.subject,
                         body: parsedEmail.body,
                         direction: EmailDirections.INBOUND,
                         sent_at: parsedEmail.date ? new Date(parsedEmail.date).toISOString() : new Date().toISOString(),
+                        to_recipients: parsedEmail.to,
+                        cc_recipients: parsedEmail.cc,
+                        bcc_recipients: parsedEmail.bcc,
+                        rfc_in_reply_to: parsedEmail.inReplyTo,
                     };
 
                     // 6a. INSERT the new email record into your database
@@ -568,6 +583,69 @@ emailRouter.get("/sync", createUser, requireMemberRole, async (req: Request, res
         return res.status(StatusCode.SuccessOK).json({
             message: `Sync complete. Processed ${syncedMessageCount} new email(s).`,
         });
+    } catch (error) {
+        return next(new RouterError(StatusCode.ServerErrorInternal, "An unexpected error occurred.", null, error));
+    }
+});
+
+/**
+ * GET /emails/task/:taskId
+ *
+ * Retrieves all emails associated with a specific contact task from the local database.
+ *
+ * @description This endpoint fetches the email thread for a given task ID from the local
+ * database and then returns all email records from that thread, ordered chronologically.
+ * This provides the full conversation history for a task.
+ *
+ * @param {string} taskId - The ID of the contact task.
+ *
+ * @returns {Object} JSON response containing:
+ * - Success (200): An array of email objects, sorted by sent_at ascending.
+ * - Error (404): No email thread found for the given task ID.
+ * - Error (500): Internal server error.
+ */
+emailRouter.get("/task/:taskIdStr", createUser, requireMemberRole, async (req: Request, res: Response, next: NextFunction) => {
+    const { taskIdStr } = req.params;
+    const taskId = parseInt(taskIdStr);
+
+    if (isNaN(taskId)) {
+        return next(new RouterError(StatusCode.ClientErrorBadRequest, "Invalid task ID format."));
+    }
+
+    try {
+        // Step 1: Find the database thread record linked to the task ID.
+        const { data: thread, error: threadError } = await supabase
+            .from(Tables.EMAIL_THREADS)
+            .select("id") // We only need the thread's primary key
+            .eq("task_id", taskId)
+            .single();
+
+        // If no thread is found, it means no emails have been sent for this task yet.
+        // This is not an error; just return an empty array.
+        if (threadError) {
+            if (threadError.code === "PGRST116") {
+                // "single() row not found"
+                return res.status(StatusCode.SuccessOK).json([]);
+            }
+            // For other errors, pass them to the error handler.
+            return next(new RouterError(StatusCode.ServerErrorInternal, "Error fetching email thread.", null, threadError));
+        }
+
+        // Step 2: Fetch all emails from our database that belong to this thread.
+        const { data: emails, error: emailsError } = await supabase
+            .from(Tables.EMAILS)
+            .select("*") // Select all columns, including the new ones
+            .eq("thread_id", thread.id)
+            .order("sent_at", { ascending: true }); // Order chronologically
+
+        if (emailsError) {
+            return next(
+                new RouterError(StatusCode.ServerErrorInternal, "Error fetching emails for the task.", null, emailsError),
+            );
+        }
+
+        // Step 3: Return the array of emails from our database.
+        return res.status(StatusCode.SuccessOK).json(emails || []);
     } catch (error) {
         return next(new RouterError(StatusCode.ServerErrorInternal, "An unexpected error occurred.", null, error));
     }

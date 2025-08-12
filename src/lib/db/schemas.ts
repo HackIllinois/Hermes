@@ -4,7 +4,7 @@ export type Database = {
     // Allows to automatically instanciate createClient with right options
     // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
     __InternalSupabase: {
-        PostgrestVersion: "12.2.3 (519615d)";
+        PostgrestVersion: "12.2.12 (cd3cf9e)";
     };
     graphql_public: {
         Tables: {
@@ -115,36 +115,54 @@ export type Database = {
             };
             emails: {
                 Row: {
+                    bcc_recipients: string[] | null;
                     body: string | null;
+                    cc_recipients: string[] | null;
                     created_at: string | null;
                     direction: Database["public"]["Enums"]["email_direction"];
-                    message_id: string;
+                    gmail_message_id: string;
+                    rfc_in_reply_to: string | null;
+                    rfc_message_id: string | null;
+                    rfc_references: string | null;
                     sender_email: string;
                     sent_at: string | null;
                     subject: string | null;
                     thread_id: number;
+                    to_recipients: string[] | null;
                     updated_at: string | null;
                 };
                 Insert: {
+                    bcc_recipients?: string[] | null;
                     body?: string | null;
+                    cc_recipients?: string[] | null;
                     created_at?: string | null;
                     direction: Database["public"]["Enums"]["email_direction"];
-                    message_id: string;
+                    gmail_message_id: string;
+                    rfc_in_reply_to?: string | null;
+                    rfc_message_id?: string | null;
+                    rfc_references?: string | null;
                     sender_email: string;
                     sent_at?: string | null;
                     subject?: string | null;
                     thread_id: number;
+                    to_recipients?: string[] | null;
                     updated_at?: string | null;
                 };
                 Update: {
+                    bcc_recipients?: string[] | null;
                     body?: string | null;
+                    cc_recipients?: string[] | null;
                     created_at?: string | null;
                     direction?: Database["public"]["Enums"]["email_direction"];
-                    message_id?: string;
+                    gmail_message_id?: string;
+                    rfc_in_reply_to?: string | null;
+                    rfc_message_id?: string | null;
+                    rfc_references?: string | null;
                     sender_email?: string;
                     sent_at?: string | null;
                     subject?: string | null;
                     thread_id?: number;
+                    to_recipients?: string[] | null;
                     updated_at?: string | null;
                 };
                 Relationships: [
@@ -233,7 +251,7 @@ export type Database = {
         Enums: {
             email_direction: "OUTBOUND" | "INBOUND";
             sponsor_status: "PENDING_EMAIL" | "CONTACTED" | "REJECTED" | "NEED_PAYMENT" | "CONFIRMED";
-            task_status: "PENDING" | "SENT" | "FOLLOWED_UP" | "COMPLETED" | "REPLIED";
+            task_status: "PENDING" | "SENT" | "FOLLOWED_UP" | "COMPLETED" | "REPLIED" | "BUMP_1" | "BUMP_2" | "BUMP_3";
             user_role: "LEAD" | "MEMBER";
         };
         CompositeTypes: {
@@ -357,7 +375,7 @@ export const Constants = {
         Enums: {
             email_direction: ["OUTBOUND", "INBOUND"],
             sponsor_status: ["PENDING_EMAIL", "CONTACTED", "REJECTED", "NEED_PAYMENT", "CONFIRMED"],
-            task_status: ["PENDING", "SENT", "FOLLOWED_UP", "COMPLETED", "REPLIED"],
+            task_status: ["PENDING", "SENT", "FOLLOWED_UP", "COMPLETED", "REPLIED", "BUMP_1", "BUMP_2", "BUMP_3"],
             user_role: ["LEAD", "MEMBER"],
         },
     },

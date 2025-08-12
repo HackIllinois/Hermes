@@ -4,20 +4,26 @@ export type EmailSendRequest = {
     contact_task_id: number;
     subject: string;
     body: string;
+    to?: string[];
     cc?: string[];
     bcc?: string[];
 };
 
 export type ParsedEmail = {
     messageId: string;
+    inReplyTo: string | null;
     from: string;
     subject: string;
+    to: string[];
+    cc: string[];
+    bcc: string[];
     body: string;
     date: string | null;
+    references: string | null;
 };
 
 export interface EmailReplyRequest {
-    thread_id: string;
+    db_thread_id: number;
     message_id_to_reply_to: string;
     body: string;
     reply_type: "REPLY" | "REPLY_ALL";
@@ -36,11 +42,11 @@ export function isValidEmailSendRequest(req: EmailSendRequest): boolean {
 }
 
 export function isValidEmailReplyRequest(req: EmailReplyRequest): boolean {
-    if (!req || !req.thread_id || !req.message_id_to_reply_to || !req.body || !req.reply_type) {
+    if (!req || !req.db_thread_id || !req.message_id_to_reply_to || !req.body || !req.reply_type) {
         return false;
     }
     if (
-        typeof req.thread_id !== "string" ||
+        typeof req.db_thread_id !== "number" ||
         typeof req.message_id_to_reply_to !== "string" ||
         typeof req.body !== "string" ||
         !Object.values(EmailReplyTypes).includes(req.reply_type)

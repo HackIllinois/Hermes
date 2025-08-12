@@ -27,9 +27,6 @@ export function isValidTaskInsertFormat(task: TaskInsert): boolean {
     }
     task.due_date = new Date(timestamp * 1000).toISOString();
 
-    task.created_at = null;
-    task.updated_at = null;
-
     return true;
 }
 

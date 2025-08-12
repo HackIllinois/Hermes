@@ -13,7 +13,10 @@ import { ParsedEmail } from "./email-formats";
  * @param fromName The sender's display name.
  * @param subject The email subject.
  * @param message The plain text body of the email.
- * @param messageIdList Optional list of message IDs to include in the References header.
+ * @param cc Optional list of CC recipients.
+ * @param bcc Optional list of BCC recipients.
+ * @param inReplyTo Optional ID of the message this is a reply to.
+ * @param references Optional space-separated string of message IDs for the References header.
  * @param threadId Optional Google thread ID to make this email a reply.
  * @returns A base64url-encoded string representing the raw email.
  */
@@ -25,13 +28,13 @@ export function makeRawMessage(
     message: string,
     cc?: string[],
     bcc?: string[],
-    messageIdList?: string[],
+    inReplyTo?: string,
+    references?: string,
     threadId?: string,
 ) {
     if (!fromName) {
         fromName = "HackIllinois";
     }
-    // Format the "From" header to include both the name and the email address.
     const fromHeader = `"${fromName}" <${fromEmail}>`;
 
     const lines = [
@@ -45,13 +48,25 @@ export function makeRawMessage(
         message,
     ];
 
-    if (threadId && messageIdList && messageIdList.length > 0) {
-        // The last ID in the references list is what we are replying to.
-        const referencesIds = messageIdList[0].split(" ");
-        const inReplyToId = referencesIds[referencesIds.length - 1];
+    if (inReplyTo && references) {
+        // According to RFC 2822, msg-id should be enclosed in < >
+        const formattedInReplyTo = `<${inReplyTo}>`;
 
-        lines.unshift(`In-Reply-To: ${inReplyToId}`, `References: ${messageIdList[0]}`);
+        // The references header should be a space-separated list of msg-ids, each in < >
+        const formattedReferences = references
+            .split(" ")
+            .filter((id) => id) // Remove any empty strings that might result from splitting
+            .map((id) => `<${id}>`)
+            .join(" ");
+
+        lines.unshift(`In-Reply-To: ${formattedInReplyTo}`);
+        lines.unshift(`References: ${formattedReferences}`);
+    } else if (inReplyTo) {
+        // Handle case where it's a reply but references are missing (less ideal, but safe)
+        lines.unshift(`In-Reply-To: <${inReplyTo}>`);
     }
+
+    console.log(lines.join("\r\n"));
 
     return Buffer.from(lines.join("\r\n")).toString("base64url");
 }
@@ -114,19 +129,34 @@ export type EmailThreadSelect = Database["public"]["Tables"]["email_threads"]["R
 export function parseGmailMessage(message: gmail_v1.Schema$Message): ParsedEmail {
     const headers = message.payload?.headers;
 
-    // Safely find and parse headers
     const fromHeader = headers?.find((h) => h.name === "From")?.value || "";
+    const toHeader = headers?.find((h) => h.name === "To")?.value || "";
+    const ccHeader = headers?.find((h) => h.name === "Cc")?.value || "";
+    const bccHeader = headers?.find((h) => h.name === "Bcc")?.value || "";
     const subjectHeader = headers?.find((h) => h.name === "Subject")?.value || "";
     const dateHeader = headers?.find((h) => h.name === "Date")?.value || null;
+    const messageIdHeader = headers?.find((h) => h.name === "Message-ID")?.value || null;
+    const inReplyToHeader = headers?.find((h) => h.name === "In-Reply-To")?.value || null;
+    const referencesHeader = headers?.find((h) => h.name === "References")?.value || null;
 
-    // Extract just the email address from a header like "Name <email@example.com>"
+    // Helper to strip surrounding angle brackets from a single ID
+    const stripBrackets = (id: string | null): string | null => (id ? id.replace(/^<|>$/g, "") : null);
+
+    // For the References header, split the string, strip brackets from each ID, then rejoin.
+    const parsedReferences = referencesHeader
+        ? referencesHeader
+              .trim()
+              .split(/\s+/)
+              .map(stripBrackets)
+              .filter((id) => id)
+              .join(" ")
+        : null;
+
     const fromEmail = fromHeader.includes("<") ? fromHeader.split("<")[1].split(">")[0] : fromHeader;
+    const toEmails = toHeader.split(",").map((email) => email.trim());
+    const ccEmails = ccHeader.split(",").map((email) => email.trim());
+    const bccEmails = bccHeader.split(",").map((email) => email.trim());
 
-    /**
-     * Recursively finds the plain text part of an email body.
-     * @param part The message part to search within.
-     * @returns The Base64 encoded data of the plain text body, or null.
-     */
     const findPlainTextPart = (part: gmail_v1.Schema$MessagePart): gmail_v1.Schema$MessagePart | null => {
         if (part.mimeType === "text/plain" && part.body?.data) {
             return part;
@@ -147,16 +177,28 @@ export function parseGmailMessage(message: gmail_v1.Schema$Message): ParsedEmail
     if (message.payload) {
         const plainTextPart = findPlainTextPart(message.payload);
         if (plainTextPart && plainTextPart.body?.data) {
-            // Decode the Base64 encoded body
             body = Buffer.from(plainTextPart.body.data, "base64").toString("utf8");
         }
     }
 
     return {
-        messageId: message.id!,
+        messageId: stripBrackets(messageIdHeader) || message.id!,
+        inReplyTo: stripBrackets(inReplyToHeader),
         from: fromEmail,
+        to: toEmails,
+        cc: ccEmails,
+        bcc: bccEmails,
         subject: subjectHeader,
         body: body,
         date: dateHeader,
+        references: parsedReferences,
     };
+}
+
+export function stripBrackets(v: string | null) {
+    return v ? v.replace(/^<|>$/g, "") : null;
+}
+
+export function getHeaderVal(headers: gmail_v1.Schema$MessagePartHeader[] | undefined, name: string) {
+    return headers?.find((h) => h.name?.toLowerCase() === name.toLowerCase())?.value ?? null;
 }

@@ -24,7 +24,6 @@ const sponsorRouter: Router = Router();
  *   - notes: string (optional) - Additional notes about the sponsor
  *   - status: "PENDING_EMAIL" | "CONTACTED" | "REJECTED" | "NEED_PAYMENT" | "CONFIRMED" (optional, defaults to "PENDING_EMAIL")
  *
- * @headers {string} Authorization - Bearer token for user authentication
  *
  * @returns {Object} JSON response containing:
  *   - Success (200):
@@ -72,7 +71,6 @@ sponsorRouter.post("/create", createUser, requireMemberRole, async (req: Request
  * @description This endpoint fetches all sponsors stored in the sponsors table.
  *              Requires authentication and member role access.
  *
- * @headers {string} Authorization - Bearer token for user authentication
  *
  * @returns {Object} JSON response containing:
  *   - Success (200): Array of sponsor objects with the following structure:
@@ -113,7 +111,6 @@ sponsorRouter.get("/", createUser, requireMemberRole, async (req: Request, res: 
  *
  * @param {string} email - The email address of the sponsor to retrieve
  *
- * @headers {string} Authorization - Bearer token for user authentication
  *
  * @returns {Object} JSON response containing:
  *   - Success (200): Sponsor object with the following structure:
@@ -169,7 +166,6 @@ sponsorRouter.get("/:email", createUser, requireMemberRole, async (req: Request,
  *
  * @param {string} companyName - The name of the company to search for (supports partial matching)
  *
- * @headers {string} Authorization - Bearer token for user authentication
  *
  * @returns {Object} JSON response containing:
  *   - Success (200): Array of sponsor objects with the following structure:

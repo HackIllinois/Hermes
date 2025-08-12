@@ -16,7 +16,6 @@ const taskRouter: Router = Router();
  * @description This endpoint fetches all tasks stored in the contact_tasks table.
  *              Requires authentication and member role access.
  *
- * @headers {string} Authorization - Bearer token for user authentication
  *
  * @returns {Object} JSON response containing:
  *   - Success (200): Array of task objects with the following structure:
@@ -56,7 +55,6 @@ taskRouter.get("/", createUser, requireMemberRole, async (req: Request, res: Res
  *
  * @param {string} id - The unique identifier of the task to retrieve
  *
- * @headers {string} Authorization - Bearer token for user authentication
  *
  * @returns {Object} JSON response containing:
  *   - Success (200): Task object with the following structure:
@@ -110,7 +108,6 @@ taskRouter.get("/:id", createUser, requireMemberRole, async (req: Request, res: 
  *   - notes: string (optional) - Additional notes for the task (defaults to empty string)
  *   - status: "PENDING" | "SENT" | "FOLLOWED_UP" | "COMPLETED" | "REPLIED" (optional, defaults to "PENDING")
  *
- * @headers {string} Authorization - Bearer token for user authentication
  *
  * @returns {Object} JSON response containing:
  *   - Success (200):
@@ -152,7 +149,6 @@ taskRouter.post("/", createUser, requireMemberRole, async (req: Request, res: Re
  *
  * @param {string} owner_id - The unique identifier of the user whose tasks to retrieve
  *
- * @headers {string} Authorization - Bearer token for user authentication
  *
  * @returns {Object} JSON response containing:
  *   - Success (200): Array of task objects with the following structure:
