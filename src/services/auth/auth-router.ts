@@ -5,7 +5,7 @@ import { BASE_BACKEND_URL, BASE_FRONTEND_URL, isProductionEnvironment } from "..
 import { supabase } from "../../lib/supabase";
 import { Database } from "../../lib/db/schemas";
 import { Tables } from "../../lib/db/strings";
-import { createUser } from "../../middleware/auth";
+import { createUser, requireMemberRole } from "../../middleware/auth";
 
 const authRouter: Router = Router();
 
@@ -222,5 +222,49 @@ authRouter.get("/callback/postman", async (req: Request, res: Response, next: Ne
         expires_in: session.expires_in,
     });
 });
+
+
+/**
+ * GET /profiles
+ *
+ * Returns all user profiles (sanitized: gmail tokens are null).
+ *
+ * @description Lists profiles for use in owner dropdowns, etc.
+ *              Requires authentication and member role access.
+ *
+ * @returns {Object[]} Array of profiles:
+ *  [{
+ *    id, name, role, created_at, updated_at,
+ *    last_history_id, last_synced_at,
+ *    gmail_token: null, gmail_refresh: null
+ *  }]
+ */
+authRouter.get(
+  "/profiles",
+  async (_req: Request, res: Response, next: NextFunction) => {
+    console.log('Request profile data');
+    const { data, error } = await supabase.from(Tables.PROFILES).select("*");
+
+    if (error) {
+      return next(
+        new RouterError(
+          StatusCode.ServerErrorInternal,
+          "Error fetching users",
+          null,
+          error
+        )
+      );
+    }
+
+    // Sanitize sensitive fields
+    const sanitized = (data ?? []).map((p) => ({
+      ...p,
+      gmail_token: null,
+      gmail_refresh: null,
+    }));
+
+    return res.status(StatusCode.SuccessOK).json(sanitized);
+  }
+);
 
 export default authRouter;

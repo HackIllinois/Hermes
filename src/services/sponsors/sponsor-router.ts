@@ -121,9 +121,9 @@ sponsorRouter.get("/", createUser, requireMemberRole, async (req: Request, res: 
  *       sponsor_email: string,
  *       sponsor_name: string,
  *       company_name: string,
- *       notes: string,
- *       status: "PENDING_EMAIL" | "CONTACTED" | "REJECTED" | "NEED_PAYMENT" | "CONFIRMED",
+ *       notes: string,TED" | "REJECTED" | "NEED_PAYMENT" | "CONFIRMED",
  *       created_at: string,
+ *       status: "PENDING_EMAIL" | "CONTAC
  *       updated_at: string
  *     }
  *   - Error (400): Email parameter is missing or invalid
