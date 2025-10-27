@@ -1,7 +1,7 @@
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
 
 export type Database = {
-    // Allows to automatically instanciate createClient with right options
+    // Allows to automatically instantiate createClient with right options
     // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
     __InternalSupabase: {
         PostgrestVersion: "12.2.12 (cd3cf9e)";
@@ -16,10 +16,10 @@ export type Database = {
         Functions: {
             graphql: {
                 Args: {
+                    extensions?: Json;
                     operationName?: string;
                     query?: string;
                     variables?: Json;
-                    extensions?: Json;
                 };
                 Returns: Json;
             };
@@ -41,7 +41,7 @@ export type Database = {
                     notes: string | null;
                     owner_id: string | null;
                     sponsor_email: string;
-                    status: Database["public"]["Enums"]["task_status"];
+                    status: Database["public"]["Enums"]["task_status"] | null;
                     updated_at: string | null;
                 };
                 Insert: {
@@ -51,7 +51,7 @@ export type Database = {
                     notes?: string | null;
                     owner_id?: string | null;
                     sponsor_email: string;
-                    status?: Database["public"]["Enums"]["task_status"];
+                    status?: Database["public"]["Enums"]["task_status"] | null;
                     updated_at?: string | null;
                 };
                 Update: {
@@ -61,7 +61,7 @@ export type Database = {
                     notes?: string | null;
                     owner_id?: string | null;
                     sponsor_email?: string;
-                    status?: Database["public"]["Enums"]["task_status"];
+                    status?: Database["public"]["Enums"]["task_status"] | null;
                     updated_at?: string | null;
                 };
                 Relationships: [
@@ -218,7 +218,7 @@ export type Database = {
                     notes: string | null;
                     sponsor_email: string;
                     sponsor_name: string;
-                    status: Database["public"]["Enums"]["sponsor_status"];
+                    status: Database["public"]["Enums"]["sponsor_status"] | null;
                     updated_at: string | null;
                 };
                 Insert: {
@@ -227,7 +227,7 @@ export type Database = {
                     notes?: string | null;
                     sponsor_email: string;
                     sponsor_name: string;
-                    status?: Database["public"]["Enums"]["sponsor_status"];
+                    status?: Database["public"]["Enums"]["sponsor_status"] | null;
                     updated_at?: string | null;
                 };
                 Update: {
@@ -236,7 +236,7 @@ export type Database = {
                     notes?: string | null;
                     sponsor_email?: string;
                     sponsor_name?: string;
-                    status?: Database["public"]["Enums"]["sponsor_status"];
+                    status?: Database["public"]["Enums"]["sponsor_status"] | null;
                     updated_at?: string | null;
                 };
                 Relationships: [];
@@ -250,8 +250,25 @@ export type Database = {
         };
         Enums: {
             email_direction: "OUTBOUND" | "INBOUND";
-            sponsor_status: "PENDING_EMAIL" | "CONTACTED" | "REJECTED" | "NEED_PAYMENT" | "CONFIRMED";
-            task_status: "PENDING" | "SENT" | "FOLLOWED_UP" | "COMPLETED" | "REPLIED" | "BUMP_1" | "BUMP_2" | "BUMP_3";
+            sponsor_status:
+                | "NOT_CONTACTED"
+                | "CONTACTED"
+                | "REJECTED"
+                | "NEED_PAYMENT"
+                | "CONFIRMED"
+                | "INVALID_CONTACT"
+                | "DEFERRED";
+            task_status:
+                | "PENDING_EMAIL"
+                | "SENT"
+                | "NEEDS_REPLY"
+                | "BUMP_1"
+                | "BUMP_2"
+                | "BUMP_3"
+                | "REJECTED"
+                | "GHOSTED"
+                | "INVALID_CONTACT"
+                | "DEFERRED";
             user_role: "LEAD" | "MEMBER";
         };
         CompositeTypes: {
@@ -374,8 +391,27 @@ export const Constants = {
     public: {
         Enums: {
             email_direction: ["OUTBOUND", "INBOUND"],
-            sponsor_status: ["PENDING_EMAIL", "CONTACTED", "REJECTED", "NEED_PAYMENT", "CONFIRMED"],
-            task_status: ["PENDING", "SENT", "FOLLOWED_UP", "COMPLETED", "REPLIED", "BUMP_1", "BUMP_2", "BUMP_3"],
+            sponsor_status: [
+                "NOT_CONTACTED",
+                "CONTACTED",
+                "REJECTED",
+                "NEED_PAYMENT",
+                "CONFIRMED",
+                "INVALID_CONTACT",
+                "DEFERRED",
+            ],
+            task_status: [
+                "PENDING_EMAIL",
+                "SENT",
+                "NEEDS_REPLY",
+                "BUMP_1",
+                "BUMP_2",
+                "BUMP_3",
+                "REJECTED",
+                "GHOSTED",
+                "INVALID_CONTACT",
+                "DEFERRED",
+            ],
             user_role: ["LEAD", "MEMBER"],
         },
     },

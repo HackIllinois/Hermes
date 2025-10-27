@@ -48,12 +48,6 @@ sponsorRouter.post("/create", createUser, requireMemberRole, async (req: Request
         return next(new RouterError(StatusCode.ClientErrorBadRequest, "Invalid sponsor format"));
     }
 
-    const user = (req as any).user;
-
-    if (!hasPermission(user)) {
-        return next(new RouterError(StatusCode.ClientErrorForbidden, "Restricted access"));
-    }
-
     const { error: dbErr } = await supabase.from(Tables.SPONSORS).insert(sponsor);
 
     if (dbErr) {
@@ -92,7 +86,17 @@ sponsorRouter.post("/create", createUser, requireMemberRole, async (req: Request
  * @see SponsorSelect - Type definition for sponsor data
  */
 sponsorRouter.get("/", createUser, requireMemberRole, async (req: Request, res: Response, next: NextFunction) => {
-    const { data, error } = await supabase.from(Tables.SPONSORS).select("*");
+    const { data, error } = await supabase.from(Tables.SPONSORS).select(`
+            *,
+            contact_tasks (
+                id,
+                status,
+                profiles (
+                    id,
+                    name
+                )
+            )
+            `);
 
     if (error) {
         return next(new RouterError(StatusCode.ServerErrorInternal, "Error fetching sponsors", null, error));

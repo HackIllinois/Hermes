@@ -2,13 +2,14 @@ import { Router, Request, Response, NextFunction } from "express";
 import { createUser, requireMemberRole } from "../../middleware/auth";
 import { RouterError } from "../../middleware/error-handler";
 import StatusCode from "status-code-enum";
-import { EmailDirections, EmailReplyTypes, EmailStatus, Tables } from "../../lib/db/strings";
+import { EmailDirections, EmailReplyTypes, EmailStatus, SponsorStatus, Tables } from "../../lib/db/strings";
 import { supabase } from "../../lib/supabase";
 import { getGmailClient, getHeaderVal, makeRawMessage, parseGmailMessage, stripBrackets } from "./email-helpers";
 import { isValidEmailSendRequest, EmailSendRequest, EmailReplyRequest, isValidEmailReplyRequest } from "./email-formats";
 import { EmailInsert, EmailThreadInsert } from "./email-helpers";
 import { gmail_v1 } from "googleapis";
 import { isValidIdFormat } from "../tasks/task-formats";
+import { Database } from "../../lib/db/schemas";
 
 const emailRouter: Router = Router();
 
@@ -198,7 +199,21 @@ emailRouter.post("/send", createUser, requireMemberRole, async (req: Request, re
         await supabase.from(Tables.EMAILS).insert(newEmail);
 
         // Update the task status to 'SENT'.
-        await supabase.from(Tables.CONTACT_TASKS).update({ status: EmailStatus.SENT }).eq("id", contact_task_id);
+        await supabase
+            .from(Tables.CONTACT_TASKS)
+            .update({
+                status: EmailStatus.SENT,
+                updated_at: new Date().toISOString(),
+            })
+            .eq("id", contact_task_id);
+
+        await supabase
+            .from(Tables.SPONSORS)
+            .update({
+                status: SponsorStatus.CONTACTED,
+                updated_at: new Date().toISOString(),
+            })
+            .eq("sponsor_email", sponsorEmail);
 
         // 8. Return success response
         return res.status(StatusCode.SuccessOK).json({
@@ -367,6 +382,39 @@ emailRouter.post("/reply", createUser, requireMemberRole, async (req: Request, r
             rfc_references: referencesHeaderValue,
         };
         await supabase.from(Tables.EMAILS).insert(newEmail);
+
+        const { data: task, error: taskError } = await supabase
+            .from(Tables.CONTACT_TASKS)
+            .select("status")
+            .eq("id", dbThread.task_id)
+            .single();
+
+        if (task && !taskError) {
+            let currentStatus = task.status;
+            let newStatus: Database["public"]["Enums"]["task_status"] | null = null;
+
+            if (isReplyingToSelf) {
+                if (currentStatus === EmailStatus.SENT) {
+                    newStatus = EmailStatus.BUMP_1;
+                } else if (currentStatus === EmailStatus.BUMP_1) {
+                    newStatus = EmailStatus.BUMP_2;
+                } else if (currentStatus === EmailStatus.BUMP_2) {
+                    newStatus = EmailStatus.BUMP_3;
+                }
+            } else {
+                newStatus = EmailStatus.NEEDS_REPLY;
+            }
+
+            if (newStatus) {
+                await supabase
+                    .from(Tables.CONTACT_TASKS)
+                    .update({
+                        status: newStatus,
+                        updated_at: new Date().toISOString(),
+                    })
+                    .eq("id", dbThread.task_id);
+            }
+        }
 
         return res.status(StatusCode.SuccessOK).json({ message: "Reply sent successfully.", data: sentMessage });
     } catch (error) {
@@ -568,7 +616,10 @@ emailRouter.get("/sync", createUser, requireMemberRole, async (req: Request, res
                     await supabase.from(Tables.EMAILS).insert(newEmailRecord);
 
                     // 6b. UPDATE the corresponding task status to 'REPLIED'
-                    await supabase.from(Tables.CONTACT_TASKS).update({ status: EmailStatus.REPLIED }).eq("id", threadInfo.taskId);
+                    await supabase
+                        .from(Tables.CONTACT_TASKS)
+                        .update({ status: EmailStatus.NEEDS_REPLY })
+                        .eq("id", threadInfo.taskId);
 
                     syncedMessageCount++;
                 }

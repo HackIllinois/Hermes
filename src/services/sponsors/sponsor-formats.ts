@@ -20,8 +20,5 @@ export function isValidSponsorInsertFormat(sponsor: SponsorInsert): boolean {
         return false;
     }
 
-    sponsor.created_at = null;
-    sponsor.updated_at = null;
-
     return true;
 }

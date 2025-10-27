@@ -17,14 +17,29 @@ export const EmailDirections = {
 } as const;
 
 export const EmailStatus = {
-    PENDING: "PENDING",
+    PENDING_EMAIL: "PENDING_EMAIL",
     SENT: "SENT",
-    REPLIED: "REPLIED",
-    FOLLOWED_UP: "FOLLOWED_UP",
-    COMPLETED: "COMPLETED",
+    NEEDS_REPLY: "NEEDS_REPLY",
+    BUMP_1: "BUMP_1",
+    BUMP_2: "BUMP_2",
+    BUMP_3: "BUMP_3",
+    REJECTED: "REJECTED",
+    GHOSTED: "GHOSTED",
+    INVALID_CONTACT: "INVALID_CONTACT",
+    DEFERRED: "DEFERRED",
 } as const;
 
 export const EmailReplyTypes = {
     REPLY: "REPLY",
     REPLY_ALL: "REPLY_ALL",
+} as const;
+
+export const SponsorStatus = {
+    NOT_CONTACTED: "NOT_CONTACTED",
+    CONTACTED: "CONTACTED",
+    REJECTED: "REJECTED",
+    NEED_PAYMENT: "NEED_PAYMENT",
+    CONFIRMED: "CONFIRMED",
+    INVALID_CONTACT: "INVALID_CONTACT",
+    DEFERRED: "DEFERRED",
 } as const;

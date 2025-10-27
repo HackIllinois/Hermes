@@ -9,6 +9,7 @@ import sponsorRouter from "./services/sponsors/sponsor-router";
 import taskRouter from "./services/tasks/task-router";
 import emailRouter from "./services/emails/email-router";
 import cookieParser from "cookie-parser";
+import profileRouter from "./services/profile/profile-router";
 
 validateEnv();
 
@@ -30,6 +31,7 @@ apiRouter.use("/auth", authRouter);
 apiRouter.use("/sponsors", sponsorRouter);
 apiRouter.use("/tasks", taskRouter);
 apiRouter.use("/emails", emailRouter);
+apiRouter.use("/profiles", profileRouter);
 
 // Mount API router under /api
 app.use("/api", apiRouter);

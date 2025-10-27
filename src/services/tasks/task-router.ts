@@ -1,10 +1,11 @@
 import { NextFunction, Router, Request, Response } from "express";
-import { Tables } from "../../lib/db/strings";
+import { EmailStatus, Roles, SponsorStatus, Tables } from "../../lib/db/strings";
 import { supabase } from "../../lib/supabase";
 import { RouterError } from "../../middleware/error-handler";
 import StatusCode from "status-code-enum";
-import { isValidIdFormat, isValidTaskInsertFormat, TaskInsert } from "./task-formats";
+import { isValidIdFormat, isValidTaskInsertFormat, isValidTaskUpdateFormat, TaskInsert, TaskUpdate } from "./task-formats";
 import { createUser, requireLeadRole, requireMemberRole } from "../../middleware/auth";
+import { Database } from "../../lib/db/schemas";
 
 const taskRouter: Router = Router();
 
@@ -36,7 +37,22 @@ const taskRouter: Router = Router();
  * @throws {RouterError} 500 - Internal server error during database operation
  */
 taskRouter.get("/", createUser, requireMemberRole, async (req: Request, res: Response, next: NextFunction) => {
-    const { data, error } = await supabase.from(Tables.CONTACT_TASKS).select("*");
+    const { owner_id } = req.query;
+    const user = (req as any).user;
+
+    let query = supabase.from(Tables.CONTACT_TASKS).select("*");
+
+    if (owner_id && owner_id === "all") {
+        // user requested tasks for everyone
+    } else if (owner_id) {
+        // User requested tasks for a specific owner
+        query = query.eq("owner_id", owner_id as string);
+    } else {
+        // DEFAULT: No param provided, so return tasks for the logged-in user
+        query = query.eq("owner_id", user.id);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
         return next(new RouterError(StatusCode.ServerErrorInternal, "Error fetching tasks", null, error));
@@ -93,7 +109,7 @@ taskRouter.get("/:id", createUser, requireMemberRole, async (req: Request, res: 
 });
 
 /**
- * POST /tasks
+ * POST /tasks/create
  *
  * Creates a new contact task in the database.
  *
@@ -123,10 +139,12 @@ taskRouter.get("/:id", createUser, requireMemberRole, async (req: Request, res: 
  * @throws {RouterError} 403 - User does not have member role access
  * @throws {RouterError} 500 - Internal server error during database operation
  */
-taskRouter.post("/", createUser, requireMemberRole, async (req: Request, res: Response, next: NextFunction) => {
+taskRouter.post("/create", createUser, requireMemberRole, async (req: Request, res: Response, next: NextFunction) => {
     const task: TaskInsert = req.body as TaskInsert;
 
-    if (!isValidTaskInsertFormat(task)) {
+    const user = (req as any).user;
+
+    if (!isValidTaskInsertFormat(task, user)) {
         return next(new RouterError(StatusCode.ClientErrorBadRequest, "Invalid task format"));
     }
 
@@ -184,5 +202,117 @@ taskRouter.get("/owner/:owner_id", createUser, requireLeadRole, async (req: Requ
     }
 
     return res.status(StatusCode.SuccessOK).json(data);
+});
+
+/**
+ * PATCH /tasks/:id
+ *
+ * Updates a specific contact task, primarily its status.
+ *
+ * @description This endpoint updates a task in the contact_tasks table.
+ * It requires authentication and that the user is either the
+ * task owner or a LEAD.
+ *
+ * **Crucially**, if the task status is updated to one of
+ * REJECTED, GHOSTED, INVALID_CONTACT, or DEFERRED,
+ * this endpoint will *also* update the status of the
+ * corresponding sponsor in the `sponsors` table.
+ *
+ * @param {string} id - The unique identifier of the task to update
+ *
+ * @body {TaskUpdate} update - The update object, e.g., { status: "REJECTED" }
+ *
+ * @returns {Object} JSON response containing:
+ * - Success (200): The updated task object
+ * - Error (400): Invalid task ID or update format
+ * - Error (403): User does not own the task and is not a LEAD
+ * - Error (404): Task not found
+ * - Error (500): Error message if database update fails
+ *
+ * @throws {RouterError} 400 - Invalid task ID or body format
+ * @throws {RouterError} 401 - Missing or invalid authentication token
+ * @throws {RouterError} 403 - User does not have permission
+ * @throws {RouterError} 404 - Task not found
+ * @throws {RouterError} 500 - Internal server error during database operation
+ */
+taskRouter.patch("/:id", createUser, requireMemberRole, async (req: Request, res: Response, next: NextFunction) => {
+    const { id } = req.params;
+    const taskUpdate: TaskUpdate = req.body as TaskUpdate;
+    const user = (req as any).user;
+
+    // 1. Validate ID and Body
+    if (!isValidIdFormat(id)) {
+        return next(new RouterError(StatusCode.ClientErrorBadRequest, "Invalid task ID"));
+    }
+
+    if (!isValidTaskUpdateFormat(taskUpdate)) {
+        return next(new RouterError(StatusCode.ClientErrorBadRequest, "Invalid update format. 'status' is required."));
+    }
+
+    const newStatus = taskUpdate.status;
+    const taskId = parseInt(id);
+
+    try {
+        const { data: task, error: fetchError } = await supabase
+            .from(Tables.CONTACT_TASKS)
+            .select("owner_id, sponsor_email")
+            .eq("id", taskId)
+            .single();
+
+        if (fetchError || !task) {
+            return next(new RouterError(StatusCode.ClientErrorNotFound, "Task not found", null, fetchError));
+        }
+
+        // 3. Authorization Check: Must be owner or LEAD
+        if (task.owner_id !== user.id && user.role !== Roles.LEAD) {
+            return next(new RouterError(StatusCode.ClientErrorForbidden, "You do not have permission to update this task."));
+        }
+
+        // 4. Update the Task Status
+        const { data: updatedTask, error: updateError } = await supabase
+            .from(Tables.CONTACT_TASKS)
+            .update({
+                status: newStatus,
+                updated_at: new Date().toISOString(),
+            })
+            .eq("id", taskId)
+            .select()
+            .single();
+
+        if (updateError) {
+            return next(new RouterError(StatusCode.ServerErrorInternal, "Error updating task", null, updateError));
+        }
+
+        const taskToSponsorStatusMap: Partial<
+            Record<Database["public"]["Enums"]["task_status"], Database["public"]["Enums"]["sponsor_status"]>
+        > = {
+            [EmailStatus.REJECTED]: SponsorStatus.REJECTED,
+            [EmailStatus.GHOSTED]: SponsorStatus.REJECTED,
+            [EmailStatus.INVALID_CONTACT]: SponsorStatus.INVALID_CONTACT,
+            [EmailStatus.DEFERRED]: SponsorStatus.DEFERRED,
+        };
+
+        const newSponsorStatus = taskToSponsorStatusMap[newStatus];
+
+        if (newSponsorStatus) {
+            const { error: sponsorUpdateError } = await supabase
+                .from(Tables.SPONSORS)
+                .update({
+                    status: newSponsorStatus,
+                    updated_at: new Date().toISOString(),
+                })
+                .eq("sponsor_email", task.sponsor_email);
+
+            if (sponsorUpdateError) {
+                // Non-fatal error: Log it but still return the successful task update
+                console.error(`Task ${taskId} updated, but failed to update sponsor ${task.sponsor_email}:`, sponsorUpdateError);
+            }
+        }
+
+        // 6. Return the updated task
+        return res.status(StatusCode.SuccessOK).json(updatedTask);
+    } catch (error) {
+        return next(new RouterError(StatusCode.ServerErrorInternal, "Error updating task", null, error));
+    }
 });
 export default taskRouter;
