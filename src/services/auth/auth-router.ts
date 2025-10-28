@@ -108,6 +108,7 @@ authRouter.get("/callback", async (req: Request, res: Response, next: NextFuncti
     const profileRow = {
         id: user.id,
         name: user.user_metadata.full_name ?? user.email!,
+        email: user.email!,
         role: roleToUse,
         gmail_token: session.provider_token as string,
         gmail_refresh: session.provider_refresh_token as string,
@@ -207,6 +208,7 @@ authRouter.get("/callback/postman", async (req: Request, res: Response, next: Ne
         role: roleToUse,
         gmail_token: session.provider_token as string,
         gmail_refresh: session.provider_refresh_token as string,
+        email: user.email!,
     };
 
     const { error: dbErr } = await supabase.from(Tables.PROFILES).upsert(profileRow);

@@ -10,6 +10,7 @@ import { EmailInsert, EmailThreadInsert } from "./email-helpers";
 import { gmail_v1 } from "googleapis";
 import { isValidIdFormat } from "../tasks/task-formats";
 import { Database } from "../../lib/db/schemas";
+import { PUBSUB_TOPIC } from "../../app";
 
 const emailRouter: Router = Router();
 
@@ -699,6 +700,54 @@ emailRouter.get("/task/:taskIdStr", createUser, requireMemberRole, async (req: R
         return res.status(StatusCode.SuccessOK).json(emails || []);
     } catch (error) {
         return next(new RouterError(StatusCode.ServerErrorInternal, "An unexpected error occurred.", null, error));
+    }
+});
+
+emailRouter.post("/watch", createUser, requireMemberRole, async (req: Request, res: Response, next: NextFunction) => {
+    const user = (req as any).user;
+
+    if (!user.email) {
+        return next(new RouterError(StatusCode.ClientErrorBadRequest, "User email is missing from auth token."));
+    }
+
+    try {
+        const gmail = await getGmailClient(user.id);
+
+        const watchResponse = await gmail.users.watch({
+            userId: "me",
+            requestBody: {
+                labelIds: ["INBOX"],
+                topicName: PUBSUB_TOPIC,
+            },
+        });
+
+        const { historyId, expiration } = watchResponse.data;
+
+        if (!historyId || !expiration) {
+            return next(new RouterError(StatusCode.ServerErrorInternal, "Gmail API did not return historyId or expiration."));
+        }
+
+        const { error: updateError } = await supabase
+            .from(Tables.PROFILES)
+            .update({
+                last_history_id: historyId,
+                watch_expiration: new Date(parseInt(expiration)).toISOString(),
+            })
+            .eq("id", user.id);
+
+        if (updateError) {
+            return next(
+                new RouterError(StatusCode.ServerErrorInternal, "Failed to save watch details to profile.", null, updateError),
+            );
+        }
+
+        return res.status(StatusCode.SuccessOK).json({
+            message: "Successfully subscribed to Gmail updates.",
+            historyId: historyId,
+            expiration: expiration,
+        });
+    } catch (error) {
+        return next(new RouterError(StatusCode.ServerErrorInternal, "Failed to create gmail watcher.", null, error));
     }
 });
 
