@@ -13,7 +13,7 @@ on:
 env:
   AWS_REGION: us-east-1
   ECR_REPOSITORY: hackillinois/hermes
-  ECS_CLUSTER: hermes-cluster
+  ECS_CLUSTER: adonix-cluster
   ECS_SERVICE: hermes-service
   CONTAINER_NAME: hermes
   TASK_FAMILY_NAME: hermes
