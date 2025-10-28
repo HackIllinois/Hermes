@@ -12,9 +12,6 @@ RUN yarn install --frozen-lockfile
 COPY src/ src/
 COPY *.md *.json .
 
-# Build
-RUN yarn build
-
 # Expose hermes port
 ENV PORT=5555
 EXPOSE ${PORT}
