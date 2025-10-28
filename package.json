@@ -25,12 +25,14 @@
         "express": "^5.1.0",
         "express-serve-static-core": "^0.1.1",
         "googleapis": "^150.0.1",
+        "node-cron": "^4.2.1",
         "status-code-enum": "^1.0.0",
         "ts-node": "^10.9.2",
         "typescript": "^5.8.3"
     },
     "devDependencies": {
         "@types/cors": "^2.8.19",
+        "@types/node-cron": "^3.0.11",
         "eslint": "^9.29.0",
         "prettier": "^3.5.3"
     }

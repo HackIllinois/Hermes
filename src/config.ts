@@ -8,12 +8,13 @@ export const config = {
     GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID || "",
     GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET || "",
     ENVIRONMENT: process.env.ENVIRONMENT || "DEV",
+    GMAIL_PUBSUB_TOPIC: process.env.GMAIL_PUBSUB_TOPIC || "",
 } as const;
 
 export const isProductionEnvironment = config.ENVIRONMENT === "PROD";
 
 export const validateEnv = (): void => {
-    const requiredEnvVars = ["SUPABASE_URL", "SUPABASE_KEY"];
+    const requiredEnvVars = ["SUPABASE_URL", "SUPABASE_KEY", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "GMAIL_PUBSUB_TOPIC"];
 
     for (const envVar of requiredEnvVars) {
         if (!process.env[envVar]) {
