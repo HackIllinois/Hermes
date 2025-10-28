@@ -178,6 +178,7 @@ export type Database = {
             profiles: {
                 Row: {
                     created_at: string | null;
+                    email: string | null;
                     gmail_refresh: string | null;
                     gmail_token: string | null;
                     id: string;
@@ -189,6 +190,7 @@ export type Database = {
                 };
                 Insert: {
                     created_at?: string | null;
+                    email?: string | null;
                     gmail_refresh?: string | null;
                     gmail_token?: string | null;
                     id: string;
@@ -200,6 +202,7 @@ export type Database = {
                 };
                 Update: {
                     created_at?: string | null;
+                    email?: string | null;
                     gmail_refresh?: string | null;
                     gmail_token?: string | null;
                     id?: string;
