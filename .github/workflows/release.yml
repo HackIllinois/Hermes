@@ -7,7 +7,7 @@
 name: Deploy
 
 on:
-  pull_requst:
+  pull_request:
     branches: [main]
   release:
     types: [published]
