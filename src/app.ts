@@ -18,6 +18,8 @@ export const PUBSUB_TOPIC = config.GMAIL_PUBSUB_TOPIC;
 
 const app: Application = express();
 
+
+console.log(`Base frontend URL: ${BASE_FRONTEND_URL}`);
 app.use(
     cors({
         origin: BASE_FRONTEND_URL,

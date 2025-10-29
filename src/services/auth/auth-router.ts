@@ -31,6 +31,8 @@ const authRouter: Router = Router();
  */
 authRouter.get("/login", async (req: Request, res: Response, next: NextFunction) => {
     const redirectUrl = BASE_BACKEND_URL + "/auth/callback";
+
+    console.log(`Redirect URL: ${redirectUrl}`);
     const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
