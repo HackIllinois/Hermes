@@ -66,8 +66,6 @@ export function makeRawMessage(
         lines.unshift(`In-Reply-To: <${inReplyTo}>`);
     }
 
-    console.log(lines.join("\r\n"));
-
     return Buffer.from(lines.join("\r\n")).toString("base64url");
 }
 
