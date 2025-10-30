@@ -731,7 +731,6 @@ emailRouter.post("/watch", createUser, requireMemberRole, async (req: Request, r
             .from(Tables.PROFILES)
             .update({
                 last_history_id: historyId,
-                watch_expiration: new Date(parseInt(expiration)).toISOString(),
             })
             .eq("id", user.id);
 
