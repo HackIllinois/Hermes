@@ -11,6 +11,7 @@ import { gmail_v1 } from "googleapis";
 import { marked } from "marked";
 import { Database } from "../../lib/db/schemas";
 import { PUBSUB_TOPIC } from "../../app";
+import { config } from "../../config";
 
 const emailRouter: Router = Router();
 
@@ -273,6 +274,10 @@ emailRouter.post("/reply", createUser, requireMemberRole, async (req: Request, r
         let to: string[] = [];
         let cc: string[] = [...(replyRequest.cc || [])]; // Start with any new CCs from the request
 
+        if (!cc.includes(config.DEFAULT_CONTACT_EMAIL)) {
+            cc.push(config.DEFAULT_CONTACT_EMAIL);
+        }
+
         const isReplyingToSelf = emailToReplyTo.sender_email === user.email;
 
         if (isReplyingToSelf) {
@@ -467,6 +472,7 @@ emailRouter.get("/profile", createUser, requireMemberRole, async (req: Request, 
 });
 
 /**
+ * @deprecated for now
  * GET /emails/sync
  *
  * TODO: update endpoint to use the new rfc_in_reply_to and rfc_references fields.

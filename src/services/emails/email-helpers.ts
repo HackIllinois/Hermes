@@ -7,6 +7,28 @@ import { gmail_v1 } from "googleapis";
 import { ParsedEmail } from "./email-formats";
 
 /**
+ * Extracts emails from formats like "User A" <a@a.com>, b@b.com
+ * @param headerString The raw To, Cc, or Bcc header value
+ * @returns An array of clean email addresses
+ */
+function parseEmailList(headerString: string): string[] {
+    if (!headerString) {
+        return [];
+    }
+
+    // Regex to find all email addresses, whether bare or in <brackets>
+    const emailRegex = /[\w.-]+@[\w.-]+\.\w+/g;
+    const matches = headerString.match(emailRegex);
+
+    if (!matches) {
+        return [];
+    }
+
+    // Return unique, lowercase emails
+    return [...new Set(matches.map((email) => email.toLowerCase()))];
+}
+
+/**
  * Creates a raw, base64-encoded email message.
  * @param to The recipient's email address.
  * @param fromEmail The sender's email address.
@@ -165,10 +187,12 @@ export function parseGmailMessage(message: gmail_v1.Schema$Message): ParsedEmail
               .join(" ")
         : null;
 
-    const fromEmail = fromHeader.includes("<") ? fromHeader.split("<")[1].split(">")[0] : fromHeader;
-    const toEmails = toHeader.split(",").map((email) => email.trim());
-    const ccEmails = ccHeader.split(",").map((email) => email.trim());
-    const bccEmails = bccHeader.split(",").map((email) => email.trim());
+    const fromEmailList = parseEmailList(fromHeader);
+    const fromEmail = fromEmailList.length > 0 ? fromEmailList[0] : ""; // 'From' should only be one
+
+    const toEmails = parseEmailList(toHeader);
+    const ccEmails = parseEmailList(ccHeader);
+    const bccEmails = parseEmailList(bccHeader);
 
     const findPlainTextPart = (part: gmail_v1.Schema$MessagePart): gmail_v1.Schema$MessagePart | null => {
         if (part.mimeType === "text/plain" && part.body?.data) {
