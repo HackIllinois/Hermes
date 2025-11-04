@@ -25,17 +25,19 @@ export function makeRawMessage(
     fromEmail: string,
     fromName: string,
     subject: string,
-    message: string,
+    plainBody: string,
+    htmlBody: string,
     cc?: string[],
     bcc?: string[],
     inReplyTo?: string,
     references?: string,
-    threadId?: string,
 ) {
     if (!fromName) {
         fromName = "HackIllinois";
     }
     const fromHeader = `"${fromName}" <${fromEmail}>`;
+
+    const boundary = `----=_Part_${Math.random().toString(36).substring(2, 15)}`;
 
     const lines = [
         `From: ${fromHeader}`,
@@ -43,9 +45,22 @@ export function makeRawMessage(
         ...(cc?.length ? [`Cc: ${cc.join(", ")}`] : []),
         ...(bcc?.length ? [`Bcc: ${bcc.join(", ")}`] : []),
         `Subject: ${subject}`,
-        `Content-Type: text/plain; charset="UTF-8"`,
+        `Content-Type: multipart/alternative; boundary="${boundary}"`,
+        "MIME-Version: 1.0",
         "",
-        message,
+        `--${boundary}`,
+        `Content-Type: text/plain; charset="UTF-8"`,
+        "Content-Transfer-Encoding: 7bit",
+        "",
+        plainBody,
+        "",
+        `--${boundary}`,
+        `Content-Type: text/html; charset="UTF-8"`,
+        "Content-Transfer-Encoding: 7bit",
+        "",
+        htmlBody,
+        "",
+        `--${boundary}--`,
     ];
 
     if (inReplyTo && references) {

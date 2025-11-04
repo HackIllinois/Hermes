@@ -8,7 +8,7 @@ import { getGmailClient, getHeaderVal, makeRawMessage, parseGmailMessage, stripB
 import { isValidEmailSendRequest, EmailSendRequest, EmailReplyRequest, isValidEmailReplyRequest } from "./email-formats";
 import { EmailInsert, EmailThreadInsert } from "./email-helpers";
 import { gmail_v1 } from "googleapis";
-import { isValidIdFormat } from "../tasks/task-formats";
+import { marked } from "marked";
 import { Database } from "../../lib/db/schemas";
 import { PUBSUB_TOPIC } from "../../app";
 
@@ -119,16 +119,20 @@ emailRouter.post("/send", createUser, requireMemberRole, async (req: Request, re
             return next(new RouterError(StatusCode.ClientErrorBadRequest, "Thread already exists."));
         }
 
+        const plainBody = body;
+        // const htmlBody = await marked.parse(body, {breaks: true});
+        const htmlBody = `<div>${marked.parse(body, { breaks: true })}</div>`;
+
         // 6. Construct and send the email via Gmail API
         const rawMessage = makeRawMessage(
             toList.join(", "),
             senderEmail,
             user.user_metadata?.name,
             subject,
-            body,
+            plainBody,
+            htmlBody,
             sendRequest.cc,
             sendRequest.bcc,
-            undefined,
             undefined,
             undefined,
         );
@@ -333,17 +337,21 @@ emailRouter.post("/reply", createUser, requireMemberRole, async (req: Request, r
             .filter(Boolean)
             .join(" ");
 
+        const plainBody = replyRequest.body;
+        // const htmlBody = await marked.parse(replyRequest.body, {breaks: true});
+        const htmlBody = `<div>${marked.parse(replyRequest.body, { breaks: true })}</div>`;
+
         const rawMessage = makeRawMessage(
             to.join(", "),
             user.email,
             user.user_metadata?.name,
             newSubject!,
-            replyRequest.body,
+            plainBody,
+            htmlBody,
             cc,
             replyRequest.bcc,
             parentRfcId,
             referencesHeaderValue,
-            googleThreadId,
         );
 
         const { data: sentMessage } = await gmail.users.messages.send({
