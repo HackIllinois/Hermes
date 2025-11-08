@@ -31,7 +31,7 @@ export async function syncUserHistory(
             .flatMap((h) => h.messagesAdded || [])
             .map((ma) => ma.message)
             .filter((msg): msg is gmail_v1.Schema$Message => !!msg);
-            
+
         if (newMessagesMetadata.length === 0) {
             if (newHistoryId) {
                 await supabase.from(Tables.PROFILES).update({ last_history_id: newHistoryId }).eq("id", userId);
@@ -111,8 +111,10 @@ export async function syncUserHistory(
 
                     // we won't update the task status here because it's outbound
                     // ideally we would update the task status even if done out of platform but leaving it for simplicity purposes
-                    await supabase.from(Tables.EMAILS).insert(newEmailRecord);
-
+                    const { error: newEmailError } = await supabase.from(Tables.EMAILS).insert(newEmailRecord);
+                    if (newEmailError) {
+                        console.error("Error inserting outbound email record", newEmailError);
+                    }
                     syncedMessageCount++;
 
                 }
