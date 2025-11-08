@@ -111,12 +111,14 @@ export async function syncUserHistory(
 
                     // we won't update the task status here because it's outbound
                     // ideally we would update the task status even if done out of platform but leaving it for simplicity purposes
-                    const { error: newEmailError } = await supabase.from(Tables.EMAILS).insert(newEmailRecord);
+                    const { error: newEmailError } = await supabase
+                        .from(Tables.EMAILS)
+                        .upsert(newEmailRecord, { ignoreDuplicates: true });
+
                     if (newEmailError) {
                         console.error("Error inserting outbound email record", newEmailError);
                     }
                     syncedMessageCount++;
-
                 }
             }
         }
