@@ -31,6 +31,40 @@ export interface EmailReplyRequest {
     bcc?: string[];
 }
 
+export interface EmailScheduleRequest {
+    contact_task_id: number;
+    send_at: string;
+    job_data: EmailReplyRequest | EmailSendRequest;
+}
+
+export type User = {
+    id: string;
+    email: string;
+    name: string;
+};
+
+export function isValidEmailScheduleRequest(req: EmailScheduleRequest): boolean {
+    if (!req || !req.contact_task_id || !req.send_at || !req.job_data) {
+        return false;
+    }
+    if (typeof req.contact_task_id !== "number" || typeof req.send_at !== "string") {
+        return false;
+    }
+
+    // Check if it's a SendRequest (has 'subject')
+    if (typeof (req.job_data as any).subject === "string") {
+        return isValidEmailSendRequest(req.job_data as EmailSendRequest);
+    }
+
+    // Check if it's a ReplyRequest (has 'message_id_to_reply_to')
+    if (typeof (req.job_data as any).message_id_to_reply_to === "string") {
+        return isValidEmailReplyRequest(req.job_data as EmailReplyRequest);
+    }
+
+    // If it's neither, it's invalid
+    return false;
+}
+
 export function isValidEmailSendRequest(req: EmailSendRequest): boolean {
     if (!req) {
         return false;

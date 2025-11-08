@@ -4,6 +4,7 @@ export const Tables = {
     EMAIL_THREADS: "email_threads",
     PROFILES: "profiles",
     SPONSORS: "sponsors",
+    SCHEDULED_SENDS: "scheduled_sends",
 } as const;
 
 export const Roles = {
@@ -42,4 +43,10 @@ export const SponsorStatus = {
     CONFIRMED: "CONFIRMED",
     INVALID_CONTACT: "INVALID_CONTACT",
     DEFERRED: "DEFERRED",
+} as const;
+
+export const ScheduleStatus = {
+    PENDING: "PENDING",
+    SENT: "SENT",
+    ERROR: "ERROR",
 } as const;

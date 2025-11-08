@@ -214,6 +214,44 @@ export type Database = {
                 };
                 Relationships: [];
             };
+            scheduled_sends: {
+                Row: {
+                    contact_task_id: number;
+                    created_at: string;
+                    error_log: string | null;
+                    id: number;
+                    job_data: Json;
+                    send_at: string;
+                    status: Database["public"]["Enums"]["schedule_status"];
+                };
+                Insert: {
+                    contact_task_id: number;
+                    created_at?: string;
+                    error_log?: string | null;
+                    id?: number;
+                    job_data: Json;
+                    send_at: string;
+                    status?: Database["public"]["Enums"]["schedule_status"];
+                };
+                Update: {
+                    contact_task_id?: number;
+                    created_at?: string;
+                    error_log?: string | null;
+                    id?: number;
+                    job_data?: Json;
+                    send_at?: string;
+                    status?: Database["public"]["Enums"]["schedule_status"];
+                };
+                Relationships: [
+                    {
+                        foreignKeyName: "scheduled_sends_contact_task_id_fkey";
+                        columns: ["contact_task_id"];
+                        isOneToOne: false;
+                        referencedRelation: "contact_tasks";
+                        referencedColumns: ["id"];
+                    },
+                ];
+            };
             sponsors: {
                 Row: {
                     company_name: string | null;
@@ -249,10 +287,28 @@ export type Database = {
             [_ in never]: never;
         };
         Functions: {
-            [_ in never]: never;
+            get_pending_scheduled_sends: {
+                Args: never;
+                Returns: {
+                    contact_task_id: number;
+                    created_at: string;
+                    error_log: string | null;
+                    id: number;
+                    job_data: Json;
+                    send_at: string;
+                    status: Database["public"]["Enums"]["schedule_status"];
+                }[];
+                SetofOptions: {
+                    from: "*";
+                    to: "scheduled_sends";
+                    isOneToOne: false;
+                    isSetofReturn: true;
+                };
+            };
         };
         Enums: {
             email_direction: "OUTBOUND" | "INBOUND";
+            schedule_status: "PENDING" | "SENT" | "ERROR";
             sponsor_status:
                 | "NOT_CONTACTED"
                 | "CONTACTED"
@@ -394,6 +450,7 @@ export const Constants = {
     public: {
         Enums: {
             email_direction: ["OUTBOUND", "INBOUND"],
+            schedule_status: ["PENDING", "SENT", "ERROR"],
             sponsor_status: [
                 "NOT_CONTACTED",
                 "CONTACTED",
