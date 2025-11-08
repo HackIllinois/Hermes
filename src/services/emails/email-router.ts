@@ -274,10 +274,6 @@ emailRouter.post("/reply", createUser, requireMemberRole, async (req: Request, r
         let to: string[] = [];
         let cc: string[] = [...(replyRequest.cc || [])]; // Start with any new CCs from the request
 
-        if (!cc.includes(config.DEFAULT_CONTACT_EMAIL)) {
-            cc.push(config.DEFAULT_CONTACT_EMAIL);
-        }
-
         const isReplyingToSelf = emailToReplyTo.sender_email === user.email;
 
         if (isReplyingToSelf) {
