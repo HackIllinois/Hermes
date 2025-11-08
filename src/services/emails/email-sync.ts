@@ -31,9 +31,7 @@ export async function syncUserHistory(
             .flatMap((h) => h.messagesAdded || [])
             .map((ma) => ma.message)
             .filter((msg): msg is gmail_v1.Schema$Message => !!msg);
-
-        console.log("newMessagesMetadata", newMessagesMetadata);
-
+            
         if (newMessagesMetadata.length === 0) {
             if (newHistoryId) {
                 await supabase.from(Tables.PROFILES).update({ last_history_id: newHistoryId }).eq("id", userId);
@@ -61,7 +59,6 @@ export async function syncUserHistory(
         for (const messageMeta of newMessagesMetadata) {
             console.log("messageMeta", messageMeta);
             if (messageMeta.id && dbThreadMap.has(messageMeta.threadId!)) {
-                console.log("messageMeta.id is in db", messageMeta.id);
                 const messageResponse = await gmail.users.messages.get({ userId: "me", id: messageMeta.id, format: "full" });
                 const fullMessage = messageResponse.data;
                 const parsedEmail = parseGmailMessage(fullMessage);
@@ -93,6 +90,31 @@ export async function syncUserHistory(
                         .update({ status: EmailStatus.NEEDS_REPLY })
                         .eq("id", threadInfo.taskId);
                     syncedMessageCount++;
+                } else {
+                    console.log("message is outbound", parsedEmail.from);
+                    const threadInfo = dbThreadMap.get(fullMessage.threadId!);
+                    if (!threadInfo) continue;
+                    const newEmailRecord: EmailInsert = {
+                        thread_id: threadInfo.dbId,
+                        gmail_message_id: fullMessage.id!,
+                        sender_email: parsedEmail.from,
+                        subject: parsedEmail.subject,
+                        body: parsedEmail.body,
+                        direction: EmailDirections.OUTBOUND,
+                        sent_at: parsedEmail.date ? new Date(parsedEmail.date).toISOString() : new Date().toISOString(),
+                        to_recipients: parsedEmail.to,
+                        cc_recipients: parsedEmail.cc,
+                        bcc_recipients: parsedEmail.bcc,
+                        rfc_in_reply_to: parsedEmail.inReplyTo,
+                        rfc_references: parsedEmail.references,
+                    };
+
+                    // we won't update the task status here because it's outbound
+                    // ideally we would update the task status even if done out of platform but leaving it for simplicity purposes
+                    await supabase.from(Tables.EMAILS).insert(newEmailRecord);
+
+                    syncedMessageCount++;
+
                 }
             }
         }
