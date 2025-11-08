@@ -32,6 +32,8 @@ export async function syncUserHistory(
             .map((ma) => ma.message)
             .filter((msg): msg is gmail_v1.Schema$Message => !!msg);
 
+        console.log("newMessagesMetadata", newMessagesMetadata);
+
         if (newMessagesMetadata.length === 0) {
             if (newHistoryId) {
                 await supabase.from(Tables.PROFILES).update({ last_history_id: newHistoryId }).eq("id", userId);
@@ -57,13 +59,16 @@ export async function syncUserHistory(
         const userEmail = (await gmail.users.getProfile({ userId: "me" })).data.emailAddress;
 
         for (const messageMeta of newMessagesMetadata) {
+            console.log("messageMeta", messageMeta);
             if (messageMeta.id && dbThreadMap.has(messageMeta.threadId!)) {
+                console.log("messageMeta.id is in db", messageMeta.id);
                 const messageResponse = await gmail.users.messages.get({ userId: "me", id: messageMeta.id, format: "full" });
                 const fullMessage = messageResponse.data;
                 const parsedEmail = parseGmailMessage(fullMessage);
 
                 // Process only INBOUND messages
                 if (parsedEmail.from !== userEmail) {
+                    console.log("message is inbound", parsedEmail.from);
                     const threadInfo = dbThreadMap.get(fullMessage.threadId!);
                     if (!threadInfo) continue;
 
