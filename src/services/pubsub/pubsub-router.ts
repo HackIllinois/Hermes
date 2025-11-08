@@ -9,7 +9,7 @@ const pubsubRouter: Router = Router();
 
 pubsubRouter.post("/gmail", async (req: Request, res: Response) => {
     res.status(StatusCode.SuccessOK).send();
-    
+
     try {
         const message = req.body.message;
         if (!message || !message.data) {
@@ -47,7 +47,7 @@ pubsubRouter.post("/gmail", async (req: Request, res: Response) => {
         // This is safer than the one from history.list, as it's the absolute latest
         await supabase.from(Tables.PROFILES).update({ last_history_id: newHistoryId }).eq("id", userId);
 
-        console.log(`Pub/Sub sync for ${emailAddress} completed: ${syncResult}`);
+        console.log(`Pub/Sub sync for ${emailAddress} completed with status: ${syncResult.status}`);
     } catch (error) {
         console.error("Failed to process Gmail Pub/Sub message:", error);
     }
