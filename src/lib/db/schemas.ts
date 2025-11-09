@@ -308,7 +308,7 @@ export type Database = {
         };
         Enums: {
             email_direction: "OUTBOUND" | "INBOUND";
-            schedule_status: "PENDING" | "SENT" | "ERROR";
+            schedule_status: "PENDING" | "SENT" | "ERROR" | "CANCELLED";
             sponsor_status:
                 | "NOT_CONTACTED"
                 | "CONTACTED"
@@ -450,7 +450,7 @@ export const Constants = {
     public: {
         Enums: {
             email_direction: ["OUTBOUND", "INBOUND"],
-            schedule_status: ["PENDING", "SENT", "ERROR"],
+            schedule_status: ["PENDING", "SENT", "ERROR", "CANCELLED"],
             sponsor_status: [
                 "NOT_CONTACTED",
                 "CONTACTED",

@@ -49,4 +49,5 @@ export const ScheduleStatus = {
     PENDING: "PENDING",
     SENT: "SENT",
     ERROR: "ERROR",
+    CANCELLED: "CANCELLED",
 } as const;

@@ -14,12 +14,7 @@ import {
     isValidEmailScheduleRequest,
     User,
 } from "./email-formats";
-import { EmailInsert, EmailThreadInsert } from "./email-helpers";
-import { gmail_v1 } from "googleapis";
-import { marked } from "marked";
-import { Database, TablesInsert, Json } from "../../lib/db/schemas";
-import { PUBSUB_TOPIC } from "../../app";
-import { config } from "../../config";
+import { TablesInsert, Json } from "../../lib/db/schemas";
 import { processNewSendRequest, processReplyRequest } from "./email-service";
 
 const emailRouter: Router = Router();
@@ -257,6 +252,53 @@ emailRouter.post("/schedule", createUser, requireMemberRole, async (req: Request
     }
 });
 
+emailRouter.delete("/unschedule/:id", createUser, requireMemberRole, async (req: Request, res: Response, next: NextFunction) => {
+    const user = (req as any).user;
+
+    const { id } = req.params;
+    const idInt = parseInt(id);
+
+    if (isNaN(idInt)) {
+        return next(new RouterError(StatusCode.ClientErrorBadRequest, "Invalid ID format."));
+    }
+
+    try {
+        // check if the user owns the scheduled send
+        const { data: scheduledSend, error: scheduledSendError } = await supabase
+            .from(Tables.SCHEDULED_SENDS)
+            .select("contact_tasks ( owner_id )")
+            .eq("id", idInt)
+            .single();
+
+        if (scheduledSendError || !scheduledSend) {
+            return next(new RouterError(StatusCode.ClientErrorNotFound, "Scheduled send not found.", null, scheduledSendError));
+        }
+
+        if (scheduledSend.contact_tasks.owner_id !== user.id) {
+            return next(
+                new RouterError(StatusCode.ClientErrorForbidden, "You do not have permission to unschedule this scheduled send."),
+            );
+        }
+
+        // update the scheduled send status to cancelled
+        const { error: updateError } = await supabase
+            .from(Tables.SCHEDULED_SENDS)
+            .update({ status: ScheduleStatus.CANCELLED })
+            .eq("id", idInt);
+
+        if (updateError) {
+            return next(new RouterError(StatusCode.ServerErrorInternal, "Failed to unschedule email.", null, updateError));
+        }
+
+        return res.status(StatusCode.SuccessOK).json({
+            message: "Email unscheduled successfully.",
+            data: scheduledSend,
+        });
+    } catch (error) {
+        return next(new RouterError(StatusCode.ServerErrorInternal, "An unexpected error occurred.", null, error));
+    }
+});
+
 /**
  * GET /emails/profile
  *
@@ -317,88 +359,54 @@ emailRouter.get("/task/:taskIdStr", createUser, requireMemberRole, async (req: R
     }
 
     try {
-        // Step 1: Find the database thread record linked to the task ID.
+        // get all pending scheduled sends for the task
+        const { data: scheduledSends, error: scheduledError } = await supabase
+            .from(Tables.SCHEDULED_SENDS)
+            .select("*")
+            .eq("contact_task_id", taskId)
+            .eq("status", ScheduleStatus.PENDING)
+            .order("send_at", { ascending: true });
+
+        if (scheduledError) {
+            return next(new RouterError(StatusCode.ServerErrorInternal, "Error fetching scheduled sends.", null, scheduledError));
+        }
+
+        // We use maybeSingle() in case a task has scheduled sends but no thread yet.
+        // find the database thread record linked to the task ID.
         const { data: thread, error: threadError } = await supabase
             .from(Tables.EMAIL_THREADS)
             .select("id") // We only need the thread's primary key
             .eq("task_id", taskId)
-            .single();
+            .maybeSingle();
 
-        // If no thread is found, it means no emails have been sent for this task yet.
-        // This is not an error; just return an empty array.
         if (threadError) {
-            if (threadError.code === "PGRST116") {
-                // "single() row not found"
-                return res.status(StatusCode.SuccessOK).json([]);
-            }
-            // For other errors, pass them to the error handler.
+            // A real error, not just "not found"
             return next(new RouterError(StatusCode.ServerErrorInternal, "Error fetching email thread.", null, threadError));
         }
 
-        // Step 2: Fetch all emails from our database that belong to this thread.
-        const { data: emails, error: emailsError } = await supabase
-            .from(Tables.EMAILS)
-            .select("*") // Select all columns, including the new ones
-            .eq("thread_id", thread.id)
-            .order("sent_at", { ascending: true }); // Order chronologically
+        let sentEmails: any[] = [];
 
-        if (emailsError) {
-            return next(
-                new RouterError(StatusCode.ServerErrorInternal, "Error fetching emails for the task.", null, emailsError),
-            );
-        }
+        if (thread) {
+            const { data: emails, error: emailsError } = await supabase
+                .from(Tables.EMAILS)
+                .select("*")
+                .eq("thread_id", thread.id)
+                .order("sent_at", { ascending: true }); // Order chronologically
 
-        // Step 3: Return the array of emails from our database.
-        return res.status(StatusCode.SuccessOK).json(emails || []);
-    } catch (error) {
-        return next(new RouterError(StatusCode.ServerErrorInternal, "An unexpected error occurred.", null, error));
-    }
-});
-
-emailRouter.post("/watch", createUser, requireMemberRole, async (req: Request, res: Response, next: NextFunction) => {
-    const user = (req as any).user;
-
-    if (!user.email) {
-        return next(new RouterError(StatusCode.ClientErrorBadRequest, "User email is missing from auth token."));
-    }
-
-    try {
-        const gmail = await getGmailClient(user.id);
-
-        const watchResponse = await gmail.users.watch({
-            userId: "me",
-            requestBody: {
-                labelIds: ["INBOX"],
-                topicName: PUBSUB_TOPIC,
-            },
-        });
-
-        const { historyId, expiration } = watchResponse.data;
-
-        if (!historyId || !expiration) {
-            return next(new RouterError(StatusCode.ServerErrorInternal, "Gmail API did not return historyId or expiration."));
-        }
-
-        const { error: updateError } = await supabase
-            .from(Tables.PROFILES)
-            .update({
-                last_history_id: historyId,
-            })
-            .eq("id", user.id);
-
-        if (updateError) {
-            return next(
-                new RouterError(StatusCode.ServerErrorInternal, "Failed to save watch details to profile.", null, updateError),
-            );
+            if (emailsError) {
+                return next(
+                    new RouterError(StatusCode.ServerErrorInternal, "Error fetching emails for the task.", null, emailsError),
+                );
+            }
+            sentEmails = emails || [];
         }
 
         return res.status(StatusCode.SuccessOK).json({
-            message: "Successfully subscribed to Gmail updates.",
-            historyId: historyId,
-            expiration: expiration,
+            sent_emails: sentEmails,
+            scheduled_sends: scheduledSends || [],
         });
     } catch (error) {
-        return next(new RouterError(StatusCode.ServerErrorInternal, "Failed to create gmail watcher.", null, error));
+        return next(new RouterError(StatusCode.ServerErrorInternal, "An unexpected error occurred.", null, error));
     }
 });
 
