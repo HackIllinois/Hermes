@@ -282,6 +282,44 @@ export type Database = {
                 };
                 Relationships: [];
             };
+            templates: {
+                Row: {
+                    body: string | null;
+                    created_at: string | null;
+                    id: number;
+                    subject: string | null;
+                    template_name: string;
+                    updated_at: string | null;
+                    user_id: string;
+                };
+                Insert: {
+                    body?: string | null;
+                    created_at?: string | null;
+                    id?: number;
+                    subject?: string | null;
+                    template_name: string;
+                    updated_at?: string | null;
+                    user_id: string;
+                };
+                Update: {
+                    body?: string | null;
+                    created_at?: string | null;
+                    id?: number;
+                    subject?: string | null;
+                    template_name?: string;
+                    updated_at?: string | null;
+                    user_id?: string;
+                };
+                Relationships: [
+                    {
+                        foreignKeyName: "templates_user_id_fkey";
+                        columns: ["user_id"];
+                        isOneToOne: false;
+                        referencedRelation: "profiles";
+                        referencedColumns: ["id"];
+                    },
+                ];
+            };
         };
         Views: {
             [_ in never]: never;

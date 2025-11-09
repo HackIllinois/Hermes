@@ -5,7 +5,6 @@ import StatusCode from "status-code-enum";
 import { Roles, Tables } from "../../lib/db/strings";
 import { supabase } from "../../lib/supabase";
 import { createUser, requireMemberRole } from "../../middleware/auth";
-import { hasPermission } from "../../lib/db/helpers";
 
 const sponsorRouter: Router = Router();
 
