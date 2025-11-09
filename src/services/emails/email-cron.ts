@@ -26,7 +26,6 @@ async function getTaskAndOwner(taskId: number): Promise<{ taskData: any; owner: 
 }
 
 export async function processScheduledSends() {
-    console.log("Starting scheduled send processing...");
     const { data: jobs, error: jobsError } = await supabase.rpc("get_pending_scheduled_sends");
 
     if (jobsError) {
