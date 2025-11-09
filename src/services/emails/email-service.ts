@@ -162,11 +162,11 @@ export async function processReplyRequest(replyRequest: EmailReplyRequest, owner
     const { data: dbThread, error: threadError } = await supabase
         .from(Tables.EMAIL_THREADS)
         .select("id, task_id, thread_id")
-        .eq("id", replyRequest.db_thread_id)
+        .eq("id", replyRequest.email_thread_id)
         .single();
 
     if (threadError || !dbThread) {
-        throw new Error(`Email thread ${replyRequest.db_thread_id} not found in db.`);
+        throw new Error(`Email thread ${replyRequest.email_thread_id} not found in db.`);
     }
 
     const googleThreadId = dbThread.thread_id;

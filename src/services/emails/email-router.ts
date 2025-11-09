@@ -118,7 +118,7 @@ emailRouter.post("/reply", createUser, requireMemberRole, async (req: Request, r
         const { data: thread, error: threadError } = await supabase
             .from(Tables.EMAIL_THREADS)
             .select(`contact_tasks ( owner_id )`) // Get the owner_id from the linked task
-            .eq("id", replyRequest.db_thread_id)
+            .eq("id", replyRequest.email_thread_id)
             .single();
 
         if (threadError || !thread) {
@@ -184,25 +184,54 @@ emailRouter.post("/schedule", createUser, requireMemberRole, async (req: Request
     }
 
     try {
-        const { contact_task_id, send_at, job_data } = scheduleRequest;
+        const { contact_task_id, job_data, email_thread_id } = scheduleRequest;
 
-        // Check if the user owns the task they are scheduling for.
-        const { data: task, error: taskError } = await supabase
-            .from(Tables.CONTACT_TASKS)
-            .select("owner_id")
-            .eq("id", contact_task_id)
-            .single();
+        let associated_task_id: number;
 
-        if (taskError || !task) {
-            return next(new RouterError(StatusCode.ClientErrorNotFound, "Contact task not found.", null, taskError));
+        if (contact_task_id) {
+            // Check if the user owns the task they are scheduling for.
+            const { data: task, error: taskError } = await supabase
+                .from(Tables.CONTACT_TASKS)
+                .select("owner_id")
+                .eq("id", contact_task_id)
+                .single();
+
+            if (taskError || !task) {
+                return next(new RouterError(StatusCode.ClientErrorNotFound, "Contact task not found.", null, taskError));
+            }
+
+            if (task.owner_id !== user.id) {
+                return next(new RouterError(StatusCode.ClientErrorForbidden, "You do not own this contact task."));
+            }
+
+            associated_task_id = contact_task_id;
+        } else if (email_thread_id) {
+            // in this case, we need to link the email thread id to the contact task id
+            const { data: thread, error: threadError } = await supabase
+                .from(Tables.EMAIL_THREADS)
+                .select(`task_id, contact_tasks ( owner_id )`) // Get task_id AND its owner
+                .eq("id", email_thread_id)
+                .single();
+
+            if (threadError || !thread) {
+                return next(new RouterError(StatusCode.ClientErrorNotFound, "Email thread not found.", null, threadError));
+            }
+            if (!thread.contact_tasks) {
+                return next(new RouterError(StatusCode.ClientErrorNotFound, "Thread is not linked to a valid task."));
+            }
+            if (thread.contact_tasks.owner_id !== user.id) {
+                return next(
+                    new RouterError(StatusCode.ClientErrorForbidden, "You do not have permission for this email thread."),
+                );
+            }
+
+            associated_task_id = thread.task_id;
+        } else {
+            return next(new RouterError(StatusCode.ClientErrorBadRequest, "Invalid request body format."));
         }
 
-        if (task.owner_id !== user.id) {
-            return next(new RouterError(StatusCode.ClientErrorForbidden, "You do not own this contact task."));
-        }
-
-        const newScheduledSend: TablesInsert<"scheduled_sends"> = {
-            contact_task_id: contact_task_id,
+        let newScheduledSend: TablesInsert<"scheduled_sends"> = {
+            contact_task_id: associated_task_id,
             send_at: sendAtISO,
             job_data: job_data as Json,
             status: ScheduleStatus.PENDING,
