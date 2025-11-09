@@ -40,7 +40,7 @@ taskRouter.get("/", createUser, requireMemberRole, async (req: Request, res: Res
     const { owner_id } = req.query;
     const user = (req as any).user;
 
-    let query = supabase.from(Tables.CONTACT_TASKS).select("*");
+    let query = supabase.from(Tables.CONTACT_TASKS).select("*, sponsors(*)");
 
     if (owner_id && owner_id === "all") {
         // user requested tasks for everyone
