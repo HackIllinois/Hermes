@@ -11,6 +11,7 @@ import emailRouter from "./services/emails/email-router";
 import cookieParser from "cookie-parser";
 import profileRouter from "./services/profile/profile-router";
 import pubsubRouter from "./services/pubsub/pubsub-router";
+import templatesRouter from "./services/templates/templates-router";
 
 validateEnv();
 
@@ -36,6 +37,7 @@ apiRouter.use("/tasks", taskRouter);
 apiRouter.use("/emails", emailRouter);
 apiRouter.use("/profiles", profileRouter);
 apiRouter.use("/pubsub", pubsubRouter);
+apiRouter.use("/templates", templatesRouter);
 
 // Mount API router under /api
 app.use("/api", apiRouter);
