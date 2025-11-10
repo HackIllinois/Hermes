@@ -61,24 +61,27 @@ export function makeRawMessage(
 
     const boundary = `----=_Part_${Math.random().toString(36).substring(2, 15)}`;
 
+    const encodedSubject = Buffer.from(subject, "utf-8").toString("base64");
+    const formattedSubject = `=?UTF-8?B?${encodedSubject}?=`;
+
     const lines = [
         `From: ${fromHeader}`,
         `To: ${to}`,
         ...(cc?.length ? [`Cc: ${cc.join(", ")}`] : []),
         ...(bcc?.length ? [`Bcc: ${bcc.join(", ")}`] : []),
-        `Subject: ${subject}`,
+        `Subject: ${formattedSubject}`,
         `Content-Type: multipart/alternative; boundary="${boundary}"`,
         "MIME-Version: 1.0",
         "",
         `--${boundary}`,
         `Content-Type: text/plain; charset="UTF-8"`,
-        "Content-Transfer-Encoding: 7bit",
+        "Content-Transfer-Encoding: 8bit",
         "",
         plainBody,
         "",
         `--${boundary}`,
         `Content-Type: text/html; charset="UTF-8"`,
-        "Content-Transfer-Encoding: 7bit",
+        "Content-Transfer-Encoding: 8bit",
         "",
         htmlBody,
         "",
