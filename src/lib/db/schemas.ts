@@ -42,6 +42,7 @@ export type Database = {
                     owner_id: string | null;
                     sponsor_email: string;
                     status: Database["public"]["Enums"]["task_status"] | null;
+                    team_id: number | null;
                     updated_at: string | null;
                 };
                 Insert: {
@@ -52,6 +53,7 @@ export type Database = {
                     owner_id?: string | null;
                     sponsor_email: string;
                     status?: Database["public"]["Enums"]["task_status"] | null;
+                    team_id?: number | null;
                     updated_at?: string | null;
                 };
                 Update: {
@@ -62,6 +64,7 @@ export type Database = {
                     owner_id?: string | null;
                     sponsor_email?: string;
                     status?: Database["public"]["Enums"]["task_status"] | null;
+                    team_id?: number | null;
                     updated_at?: string | null;
                 };
                 Relationships: [
@@ -78,6 +81,13 @@ export type Database = {
                         isOneToOne: false;
                         referencedRelation: "sponsors";
                         referencedColumns: ["sponsor_email"];
+                    },
+                    {
+                        foreignKeyName: "contact_tasks_team_id_fkey";
+                        columns: ["team_id"];
+                        isOneToOne: false;
+                        referencedRelation: "teams";
+                        referencedColumns: ["id"];
                     },
                 ];
             };
@@ -186,6 +196,7 @@ export type Database = {
                     last_synced_at: string | null;
                     name: string;
                     role: Database["public"]["Enums"]["user_role"];
+                    team_id: number | null;
                     updated_at: string | null;
                 };
                 Insert: {
@@ -198,6 +209,7 @@ export type Database = {
                     last_synced_at?: string | null;
                     name: string;
                     role: Database["public"]["Enums"]["user_role"];
+                    team_id?: number | null;
                     updated_at?: string | null;
                 };
                 Update: {
@@ -210,9 +222,18 @@ export type Database = {
                     last_synced_at?: string | null;
                     name?: string;
                     role?: Database["public"]["Enums"]["user_role"];
+                    team_id?: number | null;
                     updated_at?: string | null;
                 };
-                Relationships: [];
+                Relationships: [
+                    {
+                        foreignKeyName: "profiles_team_id_fkey";
+                        columns: ["team_id"];
+                        isOneToOne: false;
+                        referencedRelation: "teams";
+                        referencedColumns: ["id"];
+                    },
+                ];
             };
             scheduled_sends: {
                 Row: {
@@ -260,6 +281,7 @@ export type Database = {
                     sponsor_email: string;
                     sponsor_name: string;
                     status: Database["public"]["Enums"]["sponsor_status"] | null;
+                    team_id: number | null;
                     updated_at: string | null;
                 };
                 Insert: {
@@ -269,6 +291,7 @@ export type Database = {
                     sponsor_email: string;
                     sponsor_name: string;
                     status?: Database["public"]["Enums"]["sponsor_status"] | null;
+                    team_id?: number | null;
                     updated_at?: string | null;
                 };
                 Update: {
@@ -278,7 +301,34 @@ export type Database = {
                     sponsor_email?: string;
                     sponsor_name?: string;
                     status?: Database["public"]["Enums"]["sponsor_status"] | null;
+                    team_id?: number | null;
                     updated_at?: string | null;
+                };
+                Relationships: [
+                    {
+                        foreignKeyName: "sponsors_team_id_fkey";
+                        columns: ["team_id"];
+                        isOneToOne: false;
+                        referencedRelation: "teams";
+                        referencedColumns: ["id"];
+                    },
+                ];
+            };
+            teams: {
+                Row: {
+                    created_at: string | null;
+                    id: number;
+                    name: string;
+                };
+                Insert: {
+                    created_at?: string | null;
+                    id?: number;
+                    name: string;
+                };
+                Update: {
+                    created_at?: string | null;
+                    id?: number;
+                    name?: string;
                 };
                 Relationships: [];
             };
@@ -325,6 +375,11 @@ export type Database = {
             [_ in never]: never;
         };
         Functions: {
+            get_my_role: {
+                Args: never;
+                Returns: Database["public"]["Enums"]["user_role"];
+            };
+            get_my_team_id: { Args: never; Returns: number };
             get_pending_scheduled_sends: {
                 Args: never;
                 Returns: {
