@@ -3,7 +3,6 @@ import { createUser, requireMemberRole } from "../../middleware/auth";
 import { RouterError } from "../../middleware/error-handler";
 import StatusCode from "status-code-enum";
 import { EmailDirections, EmailReplyTypes, EmailStatus, ScheduleStatus, SponsorStatus, Tables } from "../../lib/db/strings";
-import { supabase } from "../../lib/supabase";
 import { getGmailClient, getHeaderVal, makeRawMessage, parseGmailMessage, stripBrackets } from "./email-helpers";
 import {
     isValidEmailSendRequest,
@@ -49,7 +48,7 @@ const emailRouter: Router = Router();
 emailRouter.post("/send", createUser, requireMemberRole, async (req: Request, res: Response, next: NextFunction) => {
     const sendRequest: EmailSendRequest = req.body;
     const user = (req as any).user; // User from createUser middleware
-
+    const supabase = (req as any).supabase;
     const owner: User = {
         id: user.id,
         email: user.email,
@@ -98,7 +97,7 @@ emailRouter.post("/send", createUser, requireMemberRole, async (req: Request, re
 emailRouter.post("/reply", createUser, requireMemberRole, async (req: Request, res: Response, next: NextFunction) => {
     const replyRequest: EmailReplyRequest = req.body;
     const user = (req as any).user;
-
+    const supabase = (req as any).supabase;
     const owner: User = {
         id: user.id,
         email: user.email,
@@ -143,7 +142,7 @@ emailRouter.post("/reply", createUser, requireMemberRole, async (req: Request, r
 
 emailRouter.post("/schedule", createUser, requireMemberRole, async (req: Request, res: Response, next: NextFunction) => {
     const user = (req as any).user;
-
+    const supabase = (req as any).supabase;
     const scheduleRequest: EmailScheduleRequest = req.body;
 
     if (!isValidEmailScheduleRequest(scheduleRequest)) {
@@ -254,7 +253,7 @@ emailRouter.post("/schedule", createUser, requireMemberRole, async (req: Request
 
 emailRouter.delete("/unschedule/:id", createUser, requireMemberRole, async (req: Request, res: Response, next: NextFunction) => {
     const user = (req as any).user;
-
+    const supabase = (req as any).supabase;
     const { id } = req.params;
     const idInt = parseInt(id);
 
@@ -325,7 +324,6 @@ emailRouter.delete("/unschedule/:id", createUser, requireMemberRole, async (req:
 emailRouter.get("/profile", createUser, requireMemberRole, async (req: Request, res: Response, next: NextFunction) => {
     const user = (req as any).user;
     const gmail = await getGmailClient(user.id);
-
     const profile = await gmail.users.getProfile({ userId: "me" });
 
     return res.status(StatusCode.SuccessOK).json({
@@ -353,7 +351,7 @@ emailRouter.get("/profile", createUser, requireMemberRole, async (req: Request, 
 emailRouter.get("/task/:taskIdStr", createUser, requireMemberRole, async (req: Request, res: Response, next: NextFunction) => {
     const { taskIdStr } = req.params;
     const taskId = parseInt(taskIdStr);
-
+    const supabase = (req as any).supabase;
     if (isNaN(taskId)) {
         return next(new RouterError(StatusCode.ClientErrorBadRequest, "Invalid task ID format."));
     }

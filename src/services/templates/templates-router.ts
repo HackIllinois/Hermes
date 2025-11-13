@@ -2,7 +2,6 @@ import { Router, Request, Response, NextFunction } from "express";
 import { createUser, requireMemberRole } from "../../middleware/auth";
 import { RouterError } from "../../middleware/error-handler";
 import StatusCode from "status-code-enum";
-import { supabase } from "../../lib/supabase";
 import { Tables } from "../../lib/db/strings";
 import {
     isValidTemplateIdFormat,
@@ -18,6 +17,7 @@ const templatesRouter: Router = Router();
 // Lists all templates for the authenticated user
 templatesRouter.get("/", createUser, requireMemberRole, async (req: Request, res: Response, next: NextFunction) => {
     const user = (req as any).user;
+    const supabase = (req as any).supabase;
 
     try {
         const { data, error } = await supabase
@@ -40,6 +40,8 @@ templatesRouter.get("/", createUser, requireMemberRole, async (req: Request, res
 // Creates a new template for the authenticated user
 templatesRouter.post("/", createUser, requireMemberRole, async (req: Request, res: Response, next: NextFunction) => {
     const user = (req as any).user;
+    const supabase = (req as any).supabase;
+
     let templateInsert: TemplateInsert = req.body as TemplateInsert;
 
     if (!isValidTemplateInsertFormat(templateInsert)) {
@@ -65,6 +67,7 @@ templatesRouter.post("/", createUser, requireMemberRole, async (req: Request, re
 // Updates a specific template
 templatesRouter.put("/:id", createUser, requireMemberRole, async (req: Request, res: Response, next: NextFunction) => {
     const user = (req as any).user;
+    const supabase = (req as any).supabase;
     const { idStr } = req.params;
     let templateUpdate: TemplateUpdate = req.body as TemplateUpdate;
 
@@ -106,6 +109,7 @@ templatesRouter.put("/:id", createUser, requireMemberRole, async (req: Request, 
 // Deletes a specific template
 templatesRouter.delete("/:id", createUser, requireMemberRole, async (req: Request, res: Response, next: NextFunction) => {
     const user = (req as any).user;
+    const supabase = (req as any).supabase;
     const { idStr } = req.params;
 
     if (!isValidTemplateIdFormat(idStr)) {

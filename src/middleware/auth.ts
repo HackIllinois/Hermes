@@ -3,6 +3,8 @@ import { supabase } from "../lib/supabase";
 import { RouterError } from "./error-handler";
 import StatusCode from "status-code-enum";
 import { Roles, Tables } from "../lib/db/strings";
+import { createClient } from "@supabase/supabase-js";
+import { config } from "../config";
 
 /**
  * Creates a user object from the auth token and attaches it to the request object
@@ -28,6 +30,14 @@ export async function createUser(req: Request, res: Response, next: NextFunction
 
     // attach user to request
     (req as any).user = { ...user, role: profile.role };
+
+    const supabaseRequestScoped = createClient(config.SUPABASE_URL, config.SUPABASE_KEY, {
+        global: {
+            headers: { Authorization: `Bearer ${token}` },
+        },
+    });
+
+    (req as any).supabase = supabaseRequestScoped;
 
     next();
 }
