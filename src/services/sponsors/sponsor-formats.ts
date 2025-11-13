@@ -1,7 +1,28 @@
-import { Database } from "../../lib/db/schemas";
+import { Constants, Database } from "../../lib/db/schemas";
 
 export type SponsorInsert = Database["public"]["Tables"]["sponsors"]["Insert"];
 export type SponsorSelect = Database["public"]["Tables"]["sponsors"]["Row"];
+export type SponsorUpdate = Database["public"]["Tables"]["sponsors"]["Update"];
+
+export function isValidSponsorUpdateFormat(sponsor: SponsorUpdate): boolean {
+    if (!sponsor) {
+        return false;
+    }
+
+    if (typeof sponsor !== "object" || Array.isArray(sponsor) || Object.keys(sponsor).length === 0) {
+        return false;
+    }
+
+    if (typeof sponsor.status !== "string") {
+        return false;
+    }
+
+    if (!Constants.public.Enums.sponsor_status.includes(sponsor.status as any)) {
+        return false;
+    }
+
+    return true;
+}
 
 export function isValidSponsorInsertFormat(sponsor: SponsorInsert): boolean {
     if (!sponsor) {

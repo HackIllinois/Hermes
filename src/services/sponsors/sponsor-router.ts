@@ -1,5 +1,5 @@
 import { Router, Request, Response, NextFunction } from "express";
-import { isValidSponsorInsertFormat, SponsorInsert } from "./sponsor-formats";
+import { isValidSponsorInsertFormat, isValidSponsorUpdateFormat, SponsorInsert, SponsorUpdate } from "./sponsor-formats";
 import { RouterError } from "../../middleware/error-handler";
 import StatusCode from "status-code-enum";
 import { Roles, Tables } from "../../lib/db/strings";
@@ -42,6 +42,8 @@ const sponsorRouter: Router = Router();
 sponsorRouter.post("/create", createUser, requireMemberRole, async (req: Request, res: Response, next: NextFunction) => {
     const sponsor: SponsorInsert = req.body as SponsorInsert;
     const supabase = (req as any).supabase;
+    const user = (req as any).user;
+    sponsor.team_id = user.team_id;
     if (!isValidSponsorInsertFormat(sponsor)) {
         return next(new RouterError(StatusCode.ClientErrorBadRequest, "Invalid sponsor format"));
     }
@@ -211,5 +213,41 @@ sponsorRouter.get(
     },
 );
 
+sponsorRouter.patch("/:email", createUser, requireMemberRole, async (req: Request, res: Response, next: NextFunction) => {
+    const { email } = req.params;
+    const supabase = (req as any).supabase;
+    const updatePayload: SponsorUpdate = req.body as SponsorUpdate;
+
+    if (!isValidSponsorUpdateFormat(updatePayload)) {
+        return next(new RouterError(StatusCode.ClientErrorBadRequest, "Invalid sponsor format"));
+    }
+
+    if (!email || typeof email !== "string") {
+        return next(new RouterError(StatusCode.ClientErrorBadRequest, "Email is required"));
+    }
+
+    try {
+        updatePayload.updated_at = new Date().toISOString();
+
+        const { data, error } = await supabase
+            .from(Tables.SPONSORS)
+            .update(updatePayload)
+            .eq("sponsor_email", email)
+            .select()
+            .single();
+
+        if (error) {
+            if (error.code === "PGRST116") {
+                // PostgREST error code for "No rows found"
+                return next(new RouterError(StatusCode.ClientErrorNotFound, "Sponsor not found"));
+            }
+            return next(new RouterError(StatusCode.ServerErrorInternal, "Error updating sponsor", null, error));
+        }
+
+        return res.status(StatusCode.SuccessOK).json(data);
+    } catch (error) {
+        return next(new RouterError(StatusCode.ServerErrorInternal, "Error updating sponsor", null, error));
+    }
+});
 
 export default sponsorRouter;

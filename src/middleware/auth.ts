@@ -23,13 +23,17 @@ export async function createUser(req: Request, res: Response, next: NextFunction
 
     if (error || !user) return next(new RouterError(StatusCode.ClientErrorUnauthorized, "Invalid or expired token", null, error));
 
-    const { data: profile, error: profErr } = await supabase.from(Tables.PROFILES).select("role").eq("id", user.id).single();
+    const { data: profile, error: profErr } = await supabase
+        .from(Tables.PROFILES)
+        .select("role, team_id")
+        .eq("id", user.id)
+        .single();
     if (profErr || !profile) {
         return next(new RouterError(StatusCode.ClientErrorForbidden, "Profile not found", null, profErr));
     }
 
     // attach user to request
-    (req as any).user = { ...user, role: profile.role };
+    (req as any).user = { ...user, role: profile.role, team_id: profile.team_id };
 
     const supabaseRequestScoped = createClient(config.SUPABASE_URL, config.SUPABASE_KEY, {
         global: {

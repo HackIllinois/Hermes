@@ -146,6 +146,7 @@ taskRouter.post("/create", createUser, requireMemberRole, async (req: Request, r
     const task: TaskInsert = req.body as TaskInsert;
 
     const user = (req as any).user;
+    task.team_id = user.team_id;
 
     if (!isValidTaskInsertFormat(task, user)) {
         return next(new RouterError(StatusCode.ClientErrorBadRequest, "Invalid task format"));
