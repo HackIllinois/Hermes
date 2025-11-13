@@ -1,6 +1,5 @@
 import { NextFunction, Router, Request, Response } from "express";
 import { EmailStatus, Roles, SponsorStatus, Tables } from "../../lib/db/strings";
-import { supabase } from "../../lib/supabase";
 import { RouterError } from "../../middleware/error-handler";
 import StatusCode from "status-code-enum";
 import { isValidIdFormat, isValidTaskInsertFormat, isValidTaskUpdateFormat, TaskInsert, TaskUpdate } from "./task-formats";
@@ -39,6 +38,8 @@ const taskRouter: Router = Router();
 taskRouter.get("/", createUser, requireMemberRole, async (req: Request, res: Response, next: NextFunction) => {
     const { owner_id } = req.query;
     const user = (req as any).user;
+
+    const supabase = (req as any).supabase;
 
     let query = supabase.from(Tables.CONTACT_TASKS).select("*, sponsors(*)");
 
@@ -93,6 +94,7 @@ taskRouter.get("/", createUser, requireMemberRole, async (req: Request, res: Res
  * @throws {RouterError} 500 - Internal server error during database operation
  */
 taskRouter.get("/:id", createUser, requireMemberRole, async (req: Request, res: Response, next: NextFunction) => {
+    const supabase = (req as any).supabase;
     const { id } = req.params;
 
     if (!isValidIdFormat(id)) {
@@ -140,6 +142,7 @@ taskRouter.get("/:id", createUser, requireMemberRole, async (req: Request, res: 
  * @throws {RouterError} 500 - Internal server error during database operation
  */
 taskRouter.post("/create", createUser, requireMemberRole, async (req: Request, res: Response, next: NextFunction) => {
+    const supabase = (req as any).supabase;
     const task: TaskInsert = req.body as TaskInsert;
 
     const user = (req as any).user;
@@ -189,6 +192,7 @@ taskRouter.post("/create", createUser, requireMemberRole, async (req: Request, r
  * @throws {RouterError} 500 - Internal server error during database operation
  */
 taskRouter.get("/owner/:owner_id", createUser, requireLeadRole, async (req: Request, res: Response, next: NextFunction) => {
+    const supabase = (req as any).supabase;
     const { owner_id } = req.params;
 
     if (!isValidIdFormat(owner_id)) {
@@ -236,6 +240,7 @@ taskRouter.get("/owner/:owner_id", createUser, requireLeadRole, async (req: Requ
  * @throws {RouterError} 500 - Internal server error during database operation
  */
 taskRouter.patch("/:id", createUser, requireMemberRole, async (req: Request, res: Response, next: NextFunction) => {
+    const supabase = (req as any).supabase;
     const { id } = req.params;
     const taskUpdate: TaskUpdate = req.body as TaskUpdate;
     const user = (req as any).user;

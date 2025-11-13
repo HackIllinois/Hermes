@@ -1,9 +1,8 @@
 import { Router, Request, Response, NextFunction } from "express";
-import { isValidSponsorInsertFormat, SponsorInsert } from "./sponsor-formats";
+import { isValidSponsorInsertFormat, isValidSponsorUpdateFormat, SponsorInsert, SponsorUpdate } from "./sponsor-formats";
 import { RouterError } from "../../middleware/error-handler";
 import StatusCode from "status-code-enum";
 import { Roles, Tables } from "../../lib/db/strings";
-import { supabase } from "../../lib/supabase";
 import { createUser, requireMemberRole } from "../../middleware/auth";
 
 const sponsorRouter: Router = Router();
@@ -42,7 +41,7 @@ const sponsorRouter: Router = Router();
  */
 sponsorRouter.post("/create", createUser, requireMemberRole, async (req: Request, res: Response, next: NextFunction) => {
     const sponsor: SponsorInsert = req.body as SponsorInsert;
-
+    const supabase = (req as any).supabase;
     if (!isValidSponsorInsertFormat(sponsor)) {
         return next(new RouterError(StatusCode.ClientErrorBadRequest, "Invalid sponsor format"));
     }
@@ -85,6 +84,7 @@ sponsorRouter.post("/create", createUser, requireMemberRole, async (req: Request
  * @see SponsorSelect - Type definition for sponsor data
  */
 sponsorRouter.get("/", createUser, requireMemberRole, async (req: Request, res: Response, next: NextFunction) => {
+    const supabase = (req as any).supabase;
     const { data, error } = await supabase.from(Tables.SPONSORS).select(`
             *,
             contact_tasks (
@@ -140,7 +140,7 @@ sponsorRouter.get("/", createUser, requireMemberRole, async (req: Request, res: 
  */
 sponsorRouter.get("/:email", createUser, requireMemberRole, async (req: Request, res: Response, next: NextFunction) => {
     const { email } = req.params;
-
+    const supabase = (req as any).supabase;
     if (!email || typeof email !== "string") {
         return next(new RouterError(StatusCode.ClientErrorBadRequest, "Email is required"));
     }
@@ -200,7 +200,7 @@ sponsorRouter.get(
         if (!companyName || typeof companyName !== "string") {
             return next(new RouterError(StatusCode.ClientErrorBadRequest, "Company name is required"));
         }
-
+        const supabase = (req as any).supabase;
         const { data, error } = await supabase.from(Tables.SPONSORS).select("*").ilike("company_name", `%${companyName}%`);
 
         if (error) {
@@ -210,5 +210,6 @@ sponsorRouter.get(
         return res.status(StatusCode.SuccessOK).json(data);
     },
 );
+
 
 export default sponsorRouter;

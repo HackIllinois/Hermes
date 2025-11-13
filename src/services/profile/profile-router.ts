@@ -1,6 +1,5 @@
 import { Router, Request, Response, NextFunction } from "express";
 import { createUser, requireMemberRole } from "../../middleware/auth";
-import { supabase } from "../../lib/supabase";
 import { Tables } from "../../lib/db/strings";
 import { RouterError } from "../../middleware/error-handler";
 import StatusCode from "status-code-enum";
@@ -13,6 +12,7 @@ const profileRouter: Router = Router();
  * Retrieves all user profiles (id and name only).
  */
 profileRouter.get("/", createUser, requireMemberRole, async (req: Request, res: Response, next: NextFunction) => {
+    const supabase = (req as any).supabase;
     // Select only the id and name, and order by name
     const { data, error } = await supabase.from(Tables.PROFILES).select("id, name").order("name", { ascending: true });
 

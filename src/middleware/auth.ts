@@ -33,8 +33,8 @@ export async function createUser(req: Request, res: Response, next: NextFunction
 
     const supabaseRequestScoped = createClient(config.SUPABASE_URL, config.SUPABASE_KEY, {
         global: {
-            headers: { Authorization: `Bearer ${token}` }
-        }
+            headers: { Authorization: `Bearer ${token}` },
+        },
     });
 
     (req as any).supabase = supabaseRequestScoped;
