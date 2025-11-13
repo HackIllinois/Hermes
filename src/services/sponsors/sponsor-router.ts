@@ -1,5 +1,5 @@
 import { Router, Request, Response, NextFunction } from "express";
-import { isValidSponsorInsertFormat, isValidSponsorUpdateFormat, SponsorInsert, SponsorUpdate } from "./sponsor-formats";
+import { isValidSponsorInsertFormat, SponsorInsert } from "./sponsor-formats";
 import { RouterError } from "../../middleware/error-handler";
 import StatusCode from "status-code-enum";
 import { Roles, Tables } from "../../lib/db/strings";
