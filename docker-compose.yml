@@ -12,7 +12,7 @@ services:
       NODE_ENV: production
       PORT: ${PORT:-5555}
     ports:
-      - "${PORT:-5555}:${PORT:-5555}"
+      - "127.0.0.1:${PORT:-5555}:${PORT:-5555}"
     healthcheck:
       test:
         [

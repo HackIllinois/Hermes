@@ -15,7 +15,9 @@
 2. Start the container with `docker compose up --build -d`
 3. View logs with `docker compose logs -f hermes`
 
-The included `docker-compose.yml` is intended to be the production-friendly entrypoint for a single EC2-hosted Hermes deployment. It builds the existing `Dockerfile`, injects environment variables from `.env`, maps the configured `PORT`, and adds a container healthcheck that works well with CodeDeploy hook scripts.
+The included `docker-compose.yml` is intended to be the production-friendly entrypoint for a single EC2-hosted Hermes deployment. It builds the existing `Dockerfile`, injects environment variables from `.env`, binds the app to `127.0.0.1:${PORT}` for Nginx to proxy to, and adds a container healthcheck that works well with CodeDeploy hook scripts.
+
+Hermes also includes an `appspec.yml` plus deployment scripts under `scripts/` so CodeDeploy can deploy the repo directly onto an EC2 instance.
 
 ## Authentication
 1. Start the server with `yarn dev`
