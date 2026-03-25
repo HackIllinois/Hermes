@@ -1,0 +1,19 @@
+version: 0.0
+os: linux
+files:
+  - source: /
+    destination: /home/ubuntu/hermes
+file_exists_behavior: OVERWRITE
+hooks:
+  AfterInstall:
+    - location: scripts/build.sh
+      timeout: 900
+      runas: root
+  ApplicationStart:
+    - location: scripts/reload_server.sh
+      timeout: 900
+      runas: root
+  ValidateService:
+    - location: scripts/validate_service.sh
+      timeout: 120
+      runas: root

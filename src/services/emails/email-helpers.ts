@@ -55,7 +55,7 @@ export function makeRawMessage(
     references?: string,
 ) {
     if (!fromName) {
-        fromName = "HackIllinois";
+        fromName = config.ORG_NAME;
     }
     const fromHeader = `"${fromName}" <${fromEmail}>`;
 

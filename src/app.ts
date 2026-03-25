@@ -18,6 +18,7 @@ validateEnv();
 export const PUBSUB_TOPIC = config.GMAIL_PUBSUB_TOPIC;
 
 const app: Application = express();
+app.enable("trust proxy");
 
 app.use(
     cors({
