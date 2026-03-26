@@ -10,14 +10,14 @@
 1. Build the server with `yarn build`
 2. Start the compiled server with `yarn start`
 
-### Docker / EC2 / CodeDeploy
-1. Create a `.env` file from `.env.example`
-2. Start the container with `docker compose up --build -d`
-3. View logs with `docker compose logs -f hermes`
+### EC2 / CodeDeploy
+1. GitHub Actions builds `dist/`
+2. CodeDeploy ships the built artifact to `/home/ubuntu/hermes`
+3. The EC2 host installs production dependencies with Yarn
+4. PM2 runs `node dist/index.js`
+5. Nginx proxies public traffic to Hermes on `127.0.0.1:5555`
 
-The included `docker-compose.yml` is intended to be the production-friendly entrypoint for a single EC2-hosted Hermes deployment. It builds the existing `Dockerfile`, injects environment variables from `.env`, binds the app to `127.0.0.1:${PORT}` for Nginx to proxy to, and adds a container healthcheck that works well with CodeDeploy hook scripts.
-
-Hermes also includes an `appspec.yml` plus deployment scripts under `scripts/` so CodeDeploy can deploy the repo directly onto an EC2 instance.
+Hermes includes an `appspec.yml`, `ecosystem.config.cjs`, and deployment scripts under `scripts/` so CodeDeploy can deploy a CI-built artifact onto an EC2 instance without compiling TypeScript on the box.
 
 ## Authentication
 1. Start the server with `yarn dev`

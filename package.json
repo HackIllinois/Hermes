@@ -14,10 +14,7 @@
         "lint:check": "yarn run eslint src --ext .js,.jsx,.ts,.tsx",
         "lint": "yarn run eslint src --ext .js,.jsx,.ts,.tsx --fix",
         "build": "tsc",
-        "verify": "yarn build && yarn lint:check && yarn format:check",
-        "docker:up": "docker compose up --build -d",
-        "docker:down": "docker compose down",
-        "docker:logs": "docker compose logs -f hermes"
+        "verify": "yarn build && yarn lint:check && yarn format:check"
     },
     "dependencies": {
         "@google-cloud/local-auth": "2.1.0",

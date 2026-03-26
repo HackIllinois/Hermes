@@ -5,8 +5,12 @@ files:
     destination: /home/ubuntu/hermes
 file_exists_behavior: OVERWRITE
 hooks:
+  BeforeInstall:
+    - location: scripts/prepare_release.sh
+      timeout: 120
+      runas: root
   AfterInstall:
-    - location: scripts/build.sh
+    - location: scripts/install_dependencies.sh
       timeout: 900
       runas: root
   ApplicationStart:
