@@ -6,8 +6,41 @@ import { supabase } from "../../lib/supabase";
 import { Database } from "../../lib/db/schemas";
 import { Tables } from "../../lib/db/strings";
 import { createUser } from "../../middleware/auth";
+import type { Session } from "@supabase/supabase-js";
+import { createOrRenewGmailWatch } from "../pubsub/pubsub-service";
 
 const authRouter: Router = Router();
+
+async function upsertProfileFromSession(session: Session) {
+    const user = session.user;
+    const { data: existing, error: existingErr } = await supabase
+        .from(Tables.PROFILES)
+        .select("role, team_id")
+        .eq("id", user.id)
+        .maybeSingle();
+
+    if (existingErr) {
+        throw new RouterError(StatusCode.ServerErrorInternal, "Error fetching existing profile", null, existingErr);
+    }
+
+    const profileRow: Database["public"]["Tables"]["profiles"]["Insert"] = {
+        id: user.id,
+        name: user.user_metadata.full_name ?? user.email!,
+        email: user.email!,
+        role: existing?.role ?? "MEMBER",
+        team_id: existing?.team_id ?? null,
+        gmail_token: session.provider_token as string,
+        gmail_refresh: session.provider_refresh_token as string,
+    };
+
+    const { error: dbErr } = await supabase.from(Tables.PROFILES).upsert(profileRow);
+
+    if (dbErr) {
+        throw new RouterError(StatusCode.ServerErrorInternal, "Error creating profile", null, dbErr);
+    }
+
+    return { teamId: existing?.team_id ?? null };
+}
 
 /**
  * GET /auth/login
@@ -18,7 +51,6 @@ const authRouter: Router = Router();
  *              It redirects the user to Google's OAuth consent screen with Gmail scope
  *              for email access. The user will be redirected to the callback URL
  *              after successful authentication.
- *              Only users with an @hackillinois.org email will be able to login.
  *
  * @returns {Object} Redirect response:
  *   - Success: Redirects to Google OAuth consent screen
@@ -84,52 +116,45 @@ authRouter.get("/login", async (req: Request, res: Response, next: NextFunction)
  * @see Database["public"]["Enums"]["user_role"] - Available user roles
  */
 authRouter.get("/callback", async (req: Request, res: Response, next: NextFunction) => {
-    const code: string = req.query.code as string;
-    if (!code) {
-        return next(new RouterError(StatusCode.ClientErrorBadRequest, "Missing code"));
+    try {
+        const code: string = req.query.code as string;
+        if (!code) {
+            return next(new RouterError(StatusCode.ClientErrorBadRequest, "Missing code"));
+        }
+
+        const {
+            data: { session },
+            error: oauthErr,
+        } = await supabase.auth.exchangeCodeForSession(code);
+
+        if (oauthErr || !session) {
+            return next(new RouterError(StatusCode.ServerErrorInternal, "OAuth exchange failed", null, oauthErr));
+        }
+
+        const { teamId } = await upsertProfileFromSession(session);
+
+        try {
+            const { historyId, expiration } = await createOrRenewGmailWatch(session.user.id);
+            console.log(
+                `Initialized Gmail watch for ${session.user.email} with historyId=${historyId} expiration=${expiration ?? "unknown"}`,
+            );
+        } catch (watchError) {
+            console.error(`Failed to initialize Gmail watch for ${session.user.email}:`, watchError);
+        }
+
+        // Set the auth cookie before sending the user back to the site.
+        res.cookie("sb-access-token", session.access_token, {
+            httpOnly: true,
+            secure: isProductionEnvironment,
+            maxAge: session.expires_in * 1000,
+            path: "/",
+        });
+
+        const postLoginPath = teamId ? "/app" : "/onboarding/team";
+        return res.redirect(`${BASE_FRONTEND_URL}${postLoginPath}`);
+    } catch (error) {
+        return next(error);
     }
-
-    const {
-        data: { session },
-        error: oauthErr,
-    } = await supabase.auth.exchangeCodeForSession(code);
-
-    if (oauthErr || !session) {
-        return next(new RouterError(StatusCode.ServerErrorInternal, "OAuth exchange failed", null, oauthErr));
-    }
-
-    const user = session.user;
-
-    // kinda a hacky way to get the role of the user, but it works. load isn't really a concern anyways
-    const { data: existing } = await supabase.from(Tables.PROFILES).select("role").eq("id", user.id).maybeSingle();
-
-    const roleToUse = existing?.role ?? "MEMBER";
-
-    const profileRow = {
-        id: user.id,
-        name: user.user_metadata.full_name ?? user.email!,
-        email: user.email!,
-        role: roleToUse,
-        gmail_token: session.provider_token as string,
-        gmail_refresh: session.provider_refresh_token as string,
-    };
-
-    const { error: dbErr } = await supabase.from(Tables.PROFILES).upsert(profileRow);
-
-    if (dbErr) {
-        return next(new RouterError(StatusCode.ServerErrorInternal, "Error creating profile", null, dbErr));
-    }
-
-    // Instead of returning JSON, set a cookie and redirect
-    res.cookie("sb-access-token", session.access_token, {
-        httpOnly: true, // The cookie is not accessible via client-side script
-        secure: isProductionEnvironment,
-        maxAge: session.expires_in * 1000,
-        path: "/",
-    });
-
-    // Redirect the user back to the main app page
-    return res.redirect(`${BASE_FRONTEND_URL}/app`);
 });
 
 /**
@@ -181,48 +206,42 @@ authRouter.get("/me", createUser, (req: Request, res: Response) => {
  * @see Database["public"]["Enums"]["user_role"] - Available user roles
  */
 authRouter.get("/callback/postman", async (req: Request, res: Response, next: NextFunction) => {
-    const code: string = req.query.code as string;
-    if (!code) {
-        return next(new RouterError(StatusCode.ClientErrorBadRequest, "Missing code"));
+    try {
+        const code: string = req.query.code as string;
+        if (!code) {
+            return next(new RouterError(StatusCode.ClientErrorBadRequest, "Missing code"));
+        }
+
+        const {
+            data: { session },
+            error: oauthErr,
+        } = await supabase.auth.exchangeCodeForSession(code);
+
+        if (oauthErr || !session) {
+            return next(new RouterError(StatusCode.ServerErrorInternal, "OAuth exchange failed", null, oauthErr));
+        }
+
+        const { teamId } = await upsertProfileFromSession(session);
+
+        try {
+            const { historyId, expiration } = await createOrRenewGmailWatch(session.user.id);
+            console.log(
+                `Initialized Gmail watch for ${session.user.email} with historyId=${historyId} expiration=${expiration ?? "unknown"}`,
+            );
+        } catch (watchError) {
+            console.error(`Failed to initialize Gmail watch for ${session.user.email}:`, watchError);
+        }
+
+        return res.status(StatusCode.SuccessOK).json({
+            message: "Authentication successful",
+            access_token: session.access_token,
+            refresh_token: session.refresh_token,
+            expires_in: session.expires_in,
+            team_id: teamId,
+        });
+    } catch (error) {
+        return next(error);
     }
-
-    const {
-        data: { session },
-        error: oauthErr,
-    } = await supabase.auth.exchangeCodeForSession(code);
-
-    if (oauthErr || !session) {
-        return next(new RouterError(StatusCode.ServerErrorInternal, "OAuth exchange failed", null, oauthErr));
-    }
-
-    const user = session.user;
-
-    // kinda a hacky way to get the role of the user, but it works. load isn't really a concern anyways
-    const { data: existing } = await supabase.from(Tables.PROFILES).select("role").eq("id", user.id).maybeSingle();
-
-    const roleToUse = existing?.role ?? "MEMBER";
-
-    const profileRow = {
-        id: user.id,
-        name: user.user_metadata.full_name ?? user.email!,
-        role: roleToUse,
-        gmail_token: session.provider_token as string,
-        gmail_refresh: session.provider_refresh_token as string,
-        email: user.email!,
-    };
-
-    const { error: dbErr } = await supabase.from(Tables.PROFILES).upsert(profileRow);
-
-    if (dbErr) {
-        return next(new RouterError(StatusCode.ServerErrorInternal, "Error creating profile", null, dbErr));
-    }
-
-    return res.status(StatusCode.SuccessOK).json({
-        message: "Authentication successful",
-        access_token: session.access_token,
-        refresh_token: session.refresh_token,
-        expires_in: session.expires_in,
-    });
 });
 
 export default authRouter;
