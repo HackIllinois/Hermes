@@ -1,7 +1,6 @@
 import { Tables } from "../../lib/db/strings";
 import { supabase } from "../../lib/supabase";
-import { PUBSUB_TOPIC } from "../../app";
-import { getGmailClient } from "../emails/email-helpers";
+import { createOrRenewGmailWatch } from "./pubsub-service";
 
 export async function renewAllGmailPubSubWatchers() {
     console.log("Starting Gmail Pub/Sub watcher renewal process...");
@@ -15,21 +14,11 @@ export async function renewAllGmailPubSubWatchers() {
 
     for (const profile of profiles) {
         try {
-            const gmail = await getGmailClient(profile.id);
+            const { historyId, expiration } = await createOrRenewGmailWatch(profile.id);
 
-            const watchResponse = await gmail.users.watch({
-                userId: "me",
-                requestBody: { labelIds: ["INBOX"], topicName: PUBSUB_TOPIC },
-            });
-
-            const { historyId } = watchResponse.data;
-
-            await supabase
-                .from(Tables.PROFILES)
-                .update({
-                    last_history_id: historyId,
-                })
-                .eq("id", profile.id);
+            console.log(
+                `Renewed Gmail watch for ${profile.email} with historyId=${historyId} expiration=${expiration ?? "unknown"}`,
+            );
         } catch (error) {
             console.error("Failed to renew Gmail Pub/Sub watcher for profile:", profile.id, error);
         }

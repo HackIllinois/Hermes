@@ -9,6 +9,9 @@ const PORT = process.env.PORT || 5555;
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT} in ${config.ENVIRONMENT} environment`);
 
+    console.log("Running Gmail watch renewal on startup.");
+    void renewAllGmailPubSubWatchers();
+
     console.log("Scheduling cron job for daily Gmail watch renewal (at 6:00 AM UTC).");
     cron.schedule(
         "0 6 * * *",
