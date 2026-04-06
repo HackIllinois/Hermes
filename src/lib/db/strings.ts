@@ -5,6 +5,7 @@ export const Tables = {
     PROFILES: "profiles",
     SPONSORS: "sponsors",
     SCHEDULED_SENDS: "scheduled_sends",
+    TEAMS: "teams",
     TEMPLATES: "templates",
 } as const;
 
