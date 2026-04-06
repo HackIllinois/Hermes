@@ -152,6 +152,26 @@ taskRouter.post("/create", createUser, requireMemberRole, async (req: Request, r
         return next(new RouterError(StatusCode.ClientErrorBadRequest, "Invalid task format"));
     }
 
+    const { data: existingTasks, error: checkError } = await supabase
+        .from(Tables.CONTACT_TASKS)
+        .select("id, status")
+        .eq("sponsor_email", task.sponsor_email);
+
+    if (checkError) {
+        return next(new RouterError(StatusCode.ServerErrorInternal, "Error checking existing tasks", null, checkError));
+    }
+
+    const hasActiveTask = existingTasks?.some(
+        (t: any) =>
+            t.status !== EmailStatus.REJECTED &&
+            t.status !== EmailStatus.GHOSTED &&
+            t.status !== EmailStatus.INVALID_CONTACT &&
+            t.status !== EmailStatus.DEFERRED
+    );
+    if (hasActiveTask) {
+        return next(new RouterError(StatusCode.ClientErrorBadRequest, "Sponsor already has an active task"));
+    }
+
     const { data: insertedTask, error: dbErr } = await supabase.from(Tables.CONTACT_TASKS).insert(task).select().single();
 
     if (dbErr) {

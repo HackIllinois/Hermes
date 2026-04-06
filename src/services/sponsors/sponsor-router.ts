@@ -2,10 +2,33 @@ import { Router, Request, Response, NextFunction } from "express";
 import { isValidSponsorInsertFormat, isValidSponsorUpdateFormat, SponsorInsert, SponsorUpdate } from "./sponsor-formats";
 import { RouterError } from "../../middleware/error-handler";
 import StatusCode from "status-code-enum";
-import { Roles, Tables } from "../../lib/db/strings";
+import { EmailStatus, Roles, Tables } from "../../lib/db/strings";
 import { createUser, requireMemberRole } from "../../middleware/auth";
 
 const sponsorRouter: Router = Router();
+
+/**
+ * Helper function to filterout inactive tasks from the sponsors array
+ * @param sponsors Array of sponsors with contact_tasks
+ * @returns Array of sponsors with only active tasks
+ */
+const filterForActive = (sponsors: any[]) => {
+    return sponsors.map((sponsor) => {
+        const { contact_tasks, ...rest } = sponsor;
+        const active_task =
+            (contact_tasks || []).find(
+                (task: any) =>
+                    task.status !== EmailStatus.REJECTED &&
+                    task.status !== EmailStatus.GHOSTED &&
+                    task.status !== EmailStatus.INVALID_CONTACT &&
+                    task.status !== EmailStatus.DEFERRED,
+            ) || null;
+        return {
+            ...rest,
+            active_task,
+        };
+    });
+};
 
 /**
  * POST /sponsors/create
@@ -92,6 +115,9 @@ sponsorRouter.get("/", createUser, requireMemberRole, async (req: Request, res: 
             contact_tasks (
                 id,
                 status,
+                notes,
+                due_date,
+                owner_id,
                 profiles (
                     id,
                     name
@@ -103,7 +129,7 @@ sponsorRouter.get("/", createUser, requireMemberRole, async (req: Request, res: 
         return next(new RouterError(StatusCode.ServerErrorInternal, "Error fetching sponsors", null, error));
     }
 
-    return res.status(StatusCode.SuccessOK).json(data);
+    return res.status(StatusCode.SuccessOK).json(filterForActive(data));
 });
 
 /**
@@ -147,7 +173,20 @@ sponsorRouter.get("/:email", createUser, requireMemberRole, async (req: Request,
         return next(new RouterError(StatusCode.ClientErrorBadRequest, "Email is required"));
     }
 
-    const { data, error } = await supabase.from(Tables.SPONSORS).select("*").eq("sponsor_email", email);
+    const { data, error } = await supabase.from(Tables.SPONSORS).select(`
+            *,
+            contact_tasks (
+                id,
+                status,
+                notes,
+                due_date,
+                owner_id,
+                profiles (
+                    id,
+                    name
+                )
+            )
+            `).eq("sponsor_email", email);
 
     if (error) {
         return next(new RouterError(StatusCode.ServerErrorInternal, "Error fetching sponsor", null, error));
@@ -157,7 +196,7 @@ sponsorRouter.get("/:email", createUser, requireMemberRole, async (req: Request,
         return next(new RouterError(StatusCode.ClientErrorNotFound, "Sponsor not found"));
     }
 
-    return res.status(StatusCode.SuccessOK).json(data);
+    return res.status(StatusCode.SuccessOK).json(filterForActive(data));
 });
 
 /**
@@ -203,13 +242,26 @@ sponsorRouter.get(
             return next(new RouterError(StatusCode.ClientErrorBadRequest, "Company name is required"));
         }
         const supabase = (req as any).supabase;
-        const { data, error } = await supabase.from(Tables.SPONSORS).select("*").ilike("company_name", `%${companyName}%`);
+        const { data, error } = await supabase.from(Tables.SPONSORS).select(`
+            *,
+            contact_tasks (
+                id,
+                status,
+                notes,
+                due_date,
+                owner_id,
+                profiles (
+                    id,
+                    name
+                )
+            )
+            `).ilike("company_name", `%${companyName}%`);
 
         if (error) {
             return next(new RouterError(StatusCode.ServerErrorInternal, "Error fetching sponsor", null, error));
         }
 
-        return res.status(StatusCode.SuccessOK).json(data);
+        return res.status(StatusCode.SuccessOK).json(filterForActive(data));
     },
 );
 
