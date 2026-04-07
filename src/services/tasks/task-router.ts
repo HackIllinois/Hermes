@@ -178,6 +178,16 @@ taskRouter.post("/create", createUser, requireMemberRole, async (req: Request, r
         return next(new RouterError(StatusCode.ServerErrorInternal, "Error creating task", null, dbErr));
     }
 
+    // Reset sponsor status to NOT_CONTACTED so it reflects the fresh active task
+    const { error: sponsorResetError } = await supabase
+        .from(Tables.SPONSORS)
+        .update({ status: SponsorStatus.NOT_CONTACTED, updated_at: new Date().toISOString() })
+        .eq("sponsor_email", task.sponsor_email);
+
+    if (sponsorResetError) {
+        console.error(`Task ${insertedTask.id} created, but failed to reset sponsor ${task.sponsor_email} status:`, sponsorResetError);
+    }
+
     return res.status(StatusCode.SuccessOK).json({ message: "Task created successfully", task_id: insertedTask.id });
 });
 

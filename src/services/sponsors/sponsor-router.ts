@@ -43,7 +43,7 @@ const filterForActive = (sponsors: any[]) => {
  *   - sponsor_name: string - Name of the sponsor contact
  *   - company_name: string - Name of the sponsor's company
  *   - notes: string (optional) - Additional notes about the sponsor
- *   - status: "PENDING_EMAIL" | "CONTACTED" | "REJECTED" | "NEED_PAYMENT" | "CONFIRMED" (optional, defaults to "PENDING_EMAIL")
+ *   - status: "NOT_CONTACTED" | "CONTACTED" | "REJECTED" | "NEED_PAYMENT" | "CONFIRMED" | "INVALID_CONTACT" | "DEFERRED" (optional, defaults to "NOT_CONTACTED")
  *
  *
  * @returns {Object} JSON response containing:
@@ -96,7 +96,7 @@ sponsorRouter.post("/create", createUser, requireMemberRole, async (req: Request
  *       sponsor_name: string,
  *       company_name: string,
  *       notes: string,
- *       status: "PENDING_EMAIL" | "CONTACTED" | "REJECTED" | "NEED_PAYMENT" | "CONFIRMED",
+ *       status: "NOT_CONTACTED" | "CONTACTED" | "REJECTED" | "NEED_PAYMENT" | "CONFIRMED" | "INVALID_CONTACT" | "DEFERRED",
  *       created_at: string,
  *       updated_at: string
  *     }
@@ -150,7 +150,7 @@ sponsorRouter.get("/", createUser, requireMemberRole, async (req: Request, res: 
  *       sponsor_name: string,
  *       company_name: string,
  *       notes: string,
- *       status: "PENDING_EMAIL" | "CONTACTED" | "REJECTED" | "NEED_PAYMENT" | "CONFIRMED",
+ *       status: "NOT_CONTACTED" | "CONTACTED" | "REJECTED" | "NEED_PAYMENT" | "CONFIRMED" | "INVALID_CONTACT" | "DEFERRED",
  *       created_at: string,
  *       updated_at: string
  *     }
@@ -218,7 +218,7 @@ sponsorRouter.get("/:email", createUser, requireMemberRole, async (req: Request,
  *       sponsor_name: string,
  *       company_name: string,
  *       notes: string,
- *       status: "PENDING_EMAIL" | "CONTACTED" | "REJECTED" | "NEED_PAYMENT" | "CONFIRMED",
+ *       status: "NOT_CONTACTED" | "CONTACTED" | "REJECTED" | "NEED_PAYMENT" | "CONFIRMED" | "INVALID_CONTACT" | "DEFERRED",
  *       created_at: string,
  *       updated_at: string
  *     }
@@ -285,7 +285,20 @@ sponsorRouter.patch("/:email", createUser, requireMemberRole, async (req: Reques
             .from(Tables.SPONSORS)
             .update(updatePayload)
             .eq("sponsor_email", email)
-            .select()
+            .select(`
+                *,
+                contact_tasks (
+                    id,
+                    status,
+                    notes,
+                    due_date,
+                    owner_id,
+                    profiles (
+                        id,
+                        name
+                    )
+                )
+            `)
             .single();
 
         if (error) {
@@ -296,7 +309,7 @@ sponsorRouter.patch("/:email", createUser, requireMemberRole, async (req: Reques
             return next(new RouterError(StatusCode.ServerErrorInternal, "Error updating sponsor", null, error));
         }
 
-        return res.status(StatusCode.SuccessOK).json(data);
+        return res.status(StatusCode.SuccessOK).json(filterForActive([data])[0]);
     } catch (error) {
         return next(new RouterError(StatusCode.ServerErrorInternal, "Error updating sponsor", null, error));
     }
