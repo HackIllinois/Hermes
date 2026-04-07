@@ -4,6 +4,8 @@ export type TaskInsert = Database["public"]["Tables"]["contact_tasks"]["Insert"]
 export type TaskSelect = Database["public"]["Tables"]["contact_tasks"]["Row"];
 export type TaskUpdate = { status: Database["public"]["Enums"]["task_status"] };
 
+export const TASK_WITH_TEAM_QUERY = "*, sponsors(*), team:teams(default_contact_email)";
+
 export function isValidTaskInsertFormat(task: TaskInsert, user: any): boolean {
     if (!task) {
         return false;

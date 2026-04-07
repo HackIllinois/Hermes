@@ -2,7 +2,7 @@ import { NextFunction, Router, Request, Response } from "express";
 import { EmailStatus, Roles, SponsorStatus, Tables } from "../../lib/db/strings";
 import { RouterError } from "../../middleware/error-handler";
 import StatusCode from "status-code-enum";
-import { isValidIdFormat, isValidTaskInsertFormat, isValidTaskUpdateFormat, TaskInsert, TaskUpdate } from "./task-formats";
+import { isValidIdFormat, isValidTaskInsertFormat, isValidTaskUpdateFormat, TASK_WITH_TEAM_QUERY, TaskInsert, TaskUpdate } from "./task-formats";
 import { createUser, requireLeadRole, requireMemberRole } from "../../middleware/auth";
 import { Database } from "../../lib/db/schemas";
 
@@ -41,7 +41,7 @@ taskRouter.get("/", createUser, requireMemberRole, async (req: Request, res: Res
 
     const supabase = (req as any).supabase;
 
-    let query = supabase.from(Tables.CONTACT_TASKS).select("*, sponsors(*)");
+    let query = supabase.from(Tables.CONTACT_TASKS).select(TASK_WITH_TEAM_QUERY);
 
     if (owner_id && owner_id === "all") {
         // user requested tasks for everyone
@@ -101,7 +101,7 @@ taskRouter.get("/:id", createUser, requireMemberRole, async (req: Request, res: 
         return next(new RouterError(StatusCode.ClientErrorBadRequest, "Invalid task ID"));
     }
 
-    const { data, error } = await supabase.from(Tables.CONTACT_TASKS).select("*").eq("id", parseInt(id));
+    const { data, error } = await supabase.from(Tables.CONTACT_TASKS).select(TASK_WITH_TEAM_QUERY).eq("id", parseInt(id));
 
     if (error) {
         return next(new RouterError(StatusCode.ServerErrorInternal, "Error fetching task", null, error));
@@ -200,7 +200,7 @@ taskRouter.get("/owner/:owner_id", createUser, requireLeadRole, async (req: Requ
         return next(new RouterError(StatusCode.ClientErrorBadRequest, "Invalid user ID"));
     }
 
-    const { data, error } = await supabase.from(Tables.CONTACT_TASKS).select("*").eq("owner_id", owner_id);
+    const { data, error } = await supabase.from(Tables.CONTACT_TASKS).select(TASK_WITH_TEAM_QUERY).eq("owner_id", owner_id);
 
     if (error) {
         return next(new RouterError(StatusCode.ServerErrorInternal, "Error fetching tasks", null, error));
@@ -282,7 +282,7 @@ taskRouter.patch("/:id", createUser, requireMemberRole, async (req: Request, res
                 updated_at: new Date().toISOString(),
             })
             .eq("id", taskId)
-            .select()
+            .select(TASK_WITH_TEAM_QUERY)
             .single();
 
         if (updateError) {
