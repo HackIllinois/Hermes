@@ -152,10 +152,40 @@ taskRouter.post("/create", createUser, requireMemberRole, async (req: Request, r
         return next(new RouterError(StatusCode.ClientErrorBadRequest, "Invalid task format"));
     }
 
+    const { data: existingTasks, error: checkError } = await supabase
+        .from(Tables.CONTACT_TASKS)
+        .select("id, status")
+        .eq("sponsor_email", task.sponsor_email);
+
+    if (checkError) {
+        return next(new RouterError(StatusCode.ServerErrorInternal, "Error checking existing tasks", null, checkError));
+    }
+
+    const hasActiveTask = existingTasks?.some(
+        (t: any) =>
+            t.status !== EmailStatus.REJECTED &&
+            t.status !== EmailStatus.GHOSTED &&
+            t.status !== EmailStatus.INVALID_CONTACT &&
+            t.status !== EmailStatus.DEFERRED
+    );
+    if (hasActiveTask) {
+        return next(new RouterError(StatusCode.ClientErrorBadRequest, "Sponsor already has an active task"));
+    }
+
     const { data: insertedTask, error: dbErr } = await supabase.from(Tables.CONTACT_TASKS).insert(task).select().single();
 
     if (dbErr) {
         return next(new RouterError(StatusCode.ServerErrorInternal, "Error creating task", null, dbErr));
+    }
+
+    // Reset sponsor status to NOT_CONTACTED so it reflects the fresh active task
+    const { error: sponsorResetError } = await supabase
+        .from(Tables.SPONSORS)
+        .update({ status: SponsorStatus.NOT_CONTACTED, updated_at: new Date().toISOString() })
+        .eq("sponsor_email", task.sponsor_email);
+
+    if (sponsorResetError) {
+        console.error(`Task ${insertedTask.id} created, but failed to reset sponsor ${task.sponsor_email} status:`, sponsorResetError);
     }
 
     return res.status(StatusCode.SuccessOK).json({ message: "Task created successfully", task_id: insertedTask.id });
