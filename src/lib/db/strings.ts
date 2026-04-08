@@ -30,6 +30,8 @@ export const EmailStatus = {
     GHOSTED: "GHOSTED",
     INVALID_CONTACT: "INVALID_CONTACT",
     DEFERRED: "DEFERRED",
+    NEED_PAYMENT: "NEED_PAYMENT",
+    CONFIRMED: "CONFIRMED",
 } as const;
 
 export const EmailReplyTypes = {
