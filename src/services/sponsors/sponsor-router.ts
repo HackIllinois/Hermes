@@ -315,4 +315,77 @@ sponsorRouter.patch("/:email", createUser, requireMemberRole, async (req: Reques
     }
 });
 
+/**
+ * DELETE /sponsors/:email
+ *
+ * Deletes a sponsor by email address.
+ *
+ * @description Deletes a sponsor from the database. If the sponsor has an active task
+ *              (not REJECTED, GHOSTED, INVALID_CONTACT, or DEFERRED), the delete is blocked
+ *              and a 409 Conflict is returned.
+ *
+ * @param {string} email - The email address of the sponsor to delete
+ *
+ * @returns {Object} JSON response:
+ *   - Success (200): { message: "Sponsor deleted successfully" }
+ *   - Error (400): Missing email
+ *   - Error (404): Sponsor not found
+ *   - Error (409): Sponsor has an active task
+ *   - Error (500): Database error
+ */
+sponsorRouter.delete("/:email", createUser, requireMemberRole, async (req: Request, res: Response, next: NextFunction) => {
+    const { email } = req.params;
+    const supabase = (req as any).supabase;
+
+    if (!email || typeof email !== "string") {
+        return next(new RouterError(StatusCode.ClientErrorBadRequest, "Email is required"));
+    }
+
+    // First, check if the sponsor exists and has any active tasks
+    const { data: sponsor, error: fetchErr } = await supabase
+        .from(Tables.SPONSORS)
+        .select(`
+            sponsor_email,
+            contact_tasks (
+                id,
+                status
+            )
+        `)
+        .eq("sponsor_email", email)
+        .maybeSingle();
+
+    if (fetchErr) {
+        return next(new RouterError(StatusCode.ServerErrorInternal, "Error fetching sponsor", null, fetchErr));
+    }
+
+    if (!sponsor) {
+        return next(new RouterError(StatusCode.ClientErrorNotFound, "Sponsor not found"));
+    }
+
+    // Check for active tasks
+    const hasActiveTask = (sponsor.contact_tasks || []).some(
+        (task: any) =>
+            task.status !== EmailStatus.REJECTED &&
+            task.status !== EmailStatus.GHOSTED &&
+            task.status !== EmailStatus.INVALID_CONTACT &&
+            task.status !== EmailStatus.DEFERRED,
+    );
+
+    if (hasActiveTask) {
+        return next(new RouterError(StatusCode.ClientErrorConflict, "Cannot delete sponsor with an active task. Close or reassign the task first."));
+    }
+
+    // Delete only the sponsor row
+    const { error: deleteErr } = await supabase
+        .from(Tables.SPONSORS)
+        .delete()
+        .eq("sponsor_email", email);
+
+    if (deleteErr) {
+        return next(new RouterError(StatusCode.ServerErrorInternal, "Error deleting sponsor", null, deleteErr));
+    }
+
+    return res.status(StatusCode.SuccessOK).json({ message: "Sponsor deleted successfully" });
+});
+
 export default sponsorRouter;

@@ -172,6 +172,22 @@ authRouter.get("/me", createUser, (req: Request, res: Response) => {
 });
 
 /**
+ * POST /auth/logout
+ *
+ * Logs the user out by clearing the authentication cookie.
+ *
+ * @description This endpoint clears the sb-access-token cookie,
+ *              effectively ending the user's session.
+ *
+ * @returns {Object} JSON response:
+ *   - Success (200): { message: "Logged out successfully" }
+ */
+authRouter.post("/logout", (_req: Request, res: Response) => {
+    res.clearCookie("sb-access-token", { path: "/" });
+    return res.status(StatusCode.SuccessOK).json({ message: "Logged out successfully" });
+});
+
+/**
  * THIS ENDPOINT IS USED FOR POSTMAN TESTING
  *
  * GET /auth/callback
