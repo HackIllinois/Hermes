@@ -179,6 +179,7 @@ taskRouter.post("/create", createUser, requireMemberRole, async (req: Request, r
     }
 
     // Reset sponsor status to NOT_CONTACTED so it reflects the fresh active task
+    // THIS MEANS THAT CREATING A NEW TASK OVERWRITES ANY PREVIOUS STATUS!!!
     const { error: sponsorResetError } = await supabase
         .from(Tables.SPONSORS)
         .update({ status: SponsorStatus.NOT_CONTACTED, updated_at: new Date().toISOString() })

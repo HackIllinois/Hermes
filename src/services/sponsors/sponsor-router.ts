@@ -1,23 +1,24 @@
 import { Router, Request, Response, NextFunction } from "express";
-import { isValidSponsorInsertFormat, isValidSponsorUpdateFormat, SponsorInsert, SponsorUpdate } from "./sponsor-formats";
+import { isValidSponsorInsertFormat, isValidSponsorUpdateFormat, SponsorInsert, SponsorSelect, SponsorUpdate } from "./sponsor-formats";
 import { RouterError } from "../../middleware/error-handler";
 import StatusCode from "status-code-enum";
-import { EmailStatus, Roles, Tables } from "../../lib/db/strings";
+import { EmailStatus, Tables } from "../../lib/db/strings";
 import { createUser, requireMemberRole } from "../../middleware/auth";
 
 const sponsorRouter: Router = Router();
 
 /**
- * Helper function to filterout inactive tasks from the sponsors array
+ * Helper function to filter out inactive tasks from the sponsors array
  * @param sponsors Array of sponsors with contact_tasks
  * @returns Array of sponsors with only active tasks
  */
-const filterForActive = (sponsors: any[]) => {
+const filterForActive = (sponsors: (SponsorSelect & { contact_tasks?: any[] })[]) => {
     return sponsors.map((sponsor) => {
         const { contact_tasks, ...rest } = sponsor;
         const active_task =
             (contact_tasks || []).find(
                 (task: any) =>
+                    task.status !== null &&
                     task.status !== EmailStatus.REJECTED &&
                     task.status !== EmailStatus.GHOSTED &&
                     task.status !== EmailStatus.INVALID_CONTACT &&
