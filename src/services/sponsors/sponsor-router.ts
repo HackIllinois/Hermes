@@ -1,5 +1,12 @@
 import { Router, Request, Response, NextFunction } from "express";
-import { isValidSponsorInsertFormat, isValidSponsorUpdateFormat, SponsorInsert, SponsorSelect, SponsorUpdate } from "./sponsor-formats";
+import {
+    isValidSponsorInsertFormat,
+    isValidSponsorUpdateFormat,
+    SponsorInsert,
+    SponsorUpdate,
+    SponsorWithActiveTask,
+    SponsorWithContactTasks,
+} from "./sponsor-formats";
 import { RouterError } from "../../middleware/error-handler";
 import StatusCode from "status-code-enum";
 import { EmailStatus, Tables } from "../../lib/db/strings";
@@ -12,12 +19,12 @@ const sponsorRouter: Router = Router();
  * @param sponsors Array of sponsors with contact_tasks
  * @returns Array of sponsors with only active tasks
  */
-const filterForActive = (sponsors: (SponsorSelect & { contact_tasks?: any[] })[]) => {
+const filterForActive = (sponsors: SponsorWithContactTasks[]): SponsorWithActiveTask[] => {
     return sponsors.map((sponsor) => {
         const { contact_tasks, ...rest } = sponsor;
         const active_task =
-            (contact_tasks || []).find(
-                (task: any) =>
+            contact_tasks.find(
+                (task) =>
                     task.status !== null &&
                     task.status !== EmailStatus.REJECTED &&
                     task.status !== EmailStatus.GHOSTED &&
@@ -174,7 +181,10 @@ sponsorRouter.get("/:email", createUser, requireMemberRole, async (req: Request,
         return next(new RouterError(StatusCode.ClientErrorBadRequest, "Email is required"));
     }
 
-    const { data, error } = await supabase.from(Tables.SPONSORS).select(`
+    const { data, error } = await supabase
+        .from(Tables.SPONSORS)
+        .select(
+            `
             *,
             contact_tasks (
                 id,
@@ -187,7 +197,9 @@ sponsorRouter.get("/:email", createUser, requireMemberRole, async (req: Request,
                     name
                 )
             )
-            `).eq("sponsor_email", email);
+            `,
+        )
+        .eq("sponsor_email", email);
 
     if (error) {
         return next(new RouterError(StatusCode.ServerErrorInternal, "Error fetching sponsor", null, error));
@@ -243,7 +255,10 @@ sponsorRouter.get(
             return next(new RouterError(StatusCode.ClientErrorBadRequest, "Company name is required"));
         }
         const supabase = (req as any).supabase;
-        const { data, error } = await supabase.from(Tables.SPONSORS).select(`
+        const { data, error } = await supabase
+            .from(Tables.SPONSORS)
+            .select(
+                `
             *,
             contact_tasks (
                 id,
@@ -256,7 +271,9 @@ sponsorRouter.get(
                     name
                 )
             )
-            `).ilike("company_name", `%${companyName}%`);
+            `,
+            )
+            .ilike("company_name", `%${companyName}%`);
 
         if (error) {
             return next(new RouterError(StatusCode.ServerErrorInternal, "Error fetching sponsor", null, error));
@@ -286,7 +303,8 @@ sponsorRouter.patch("/:email", createUser, requireMemberRole, async (req: Reques
             .from(Tables.SPONSORS)
             .update(updatePayload)
             .eq("sponsor_email", email)
-            .select(`
+            .select(
+                `
                 *,
                 contact_tasks (
                     id,
@@ -299,7 +317,8 @@ sponsorRouter.patch("/:email", createUser, requireMemberRole, async (req: Reques
                         name
                     )
                 )
-            `)
+            `,
+            )
             .single();
 
         if (error) {

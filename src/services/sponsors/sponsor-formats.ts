@@ -1,8 +1,19 @@
 import { Constants, Database } from "../../lib/db/schemas";
+import { TaskSelect } from "../tasks/task-formats";
 
 export type SponsorInsert = Database["public"]["Tables"]["sponsors"]["Insert"];
 export type SponsorSelect = Database["public"]["Tables"]["sponsors"]["Row"];
 export type SponsorUpdate = Database["public"]["Tables"]["sponsors"]["Update"];
+export type SponsorTaskProfile = Pick<Database["public"]["Tables"]["profiles"]["Row"], "id" | "name">;
+export type SponsorContactTask = Pick<TaskSelect, "id" | "status" | "notes" | "due_date" | "owner_id"> & {
+    profiles: SponsorTaskProfile | null;
+};
+export type SponsorWithContactTasks = SponsorSelect & {
+    contact_tasks: SponsorContactTask[];
+};
+export type SponsorWithActiveTask = Omit<SponsorWithContactTasks, "contact_tasks"> & {
+    active_task: SponsorContactTask | null;
+};
 
 export function isValidSponsorUpdateFormat(sponsor: SponsorUpdate): boolean {
     if (!sponsor) {
