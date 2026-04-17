@@ -166,7 +166,7 @@ taskRouter.post("/create", createUser, requireMemberRole, async (req: Request, r
             t.status !== EmailStatus.REJECTED &&
             t.status !== EmailStatus.GHOSTED &&
             t.status !== EmailStatus.INVALID_CONTACT &&
-            t.status !== EmailStatus.DEFERRED
+            t.status !== EmailStatus.DEFERRED,
     );
     if (hasActiveTask) {
         return next(new RouterError(StatusCode.ClientErrorBadRequest, "Sponsor already has an active task"));
@@ -186,7 +186,10 @@ taskRouter.post("/create", createUser, requireMemberRole, async (req: Request, r
         .eq("sponsor_email", task.sponsor_email);
 
     if (sponsorResetError) {
-        console.error(`Task ${insertedTask.id} created, but failed to reset sponsor ${task.sponsor_email} status:`, sponsorResetError);
+        console.error(
+            `Task ${insertedTask.id} created, but failed to reset sponsor ${task.sponsor_email} status:`,
+            sponsorResetError,
+        );
     }
 
     return res.status(StatusCode.SuccessOK).json({ message: "Task created successfully", task_id: insertedTask.id });
