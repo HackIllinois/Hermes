@@ -15,12 +15,8 @@ export const config = {
     GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID || "",
     GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET || "",
     ENVIRONMENT: process.env.ENVIRONMENT || "DEV",
-    FRONTEND_URL: normalizeBaseUrl(
-        process.env.FRONTEND_URL || DEFAULT_FRONTEND_URL,
-    ),
-    BACKEND_URL: normalizeBaseUrl(
-        process.env.BACKEND_URL || DEFAULT_BACKEND_URL,
-    ),
+    FRONTEND_URL: normalizeBaseUrl(process.env.FRONTEND_URL || DEFAULT_FRONTEND_URL),
+    BACKEND_URL: normalizeBaseUrl(process.env.BACKEND_URL || DEFAULT_BACKEND_URL),
     GMAIL_PUBSUB_TOPIC: process.env.GMAIL_PUBSUB_TOPIC || "",
     ORG_NAME: process.env.ORG_NAME || "",
 } as const;
@@ -36,7 +32,7 @@ export const validateEnv = (): void => {
         "FRONTEND_URL",
         "BACKEND_URL",
         "GMAIL_PUBSUB_TOPIC",
-        "ORG_NAME"
+        "ORG_NAME",
     ];
 
     for (const envVar of requiredEnvVars) {
