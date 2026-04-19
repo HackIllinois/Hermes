@@ -183,7 +183,11 @@ authRouter.get("/me", createUser, (req: Request, res: Response) => {
  *   - Success (200): { message: "Logged out successfully" }
  */
 authRouter.post("/logout", (_req: Request, res: Response) => {
-    res.clearCookie("sb-access-token", { path: "/" });
+    res.clearCookie("sb-access-token", {
+        path: "/",
+        httpOnly: true,
+        secure: isProductionEnvironment,
+    });
     return res.status(StatusCode.SuccessOK).json({ message: "Logged out successfully" });
 });
 
